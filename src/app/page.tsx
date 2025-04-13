@@ -99,6 +99,7 @@ export default function Home() {
           </Button>
 
           <Button
+           onClick={ () => router.push('/see-cards')}
             variant="outline"
             className="w-full h-14 bg-white text-black border-2 border-black hover:bg-gray-100 rounded-sm flex items-center justify-center gap-2"
           >
