@@ -5,34 +5,55 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // O Supabase serve a app pelo pooler (pgbouncer), mas as migrations exigem
+  // conexao direta. Em dev local as duas apontam pro mesmo Postgres.
+  directUrl = env("DIRECT_URL")
 }
 
 model Game {
-  id        String     @id @default(uuid())
-  code      String     @unique
-  createdAt DateTime   @default(now())
-  players   Player[]
-  rounds    Round[]
-  status    GameStatus @default(LOBBY)
+  id          String     @id @default(uuid())
+  code        String     @unique
+  createdAt   DateTime   @default(now())
+  status      GameStatus @default(LOBBY)
+  /// Pontos necessarios para vencer a partida.
+  targetScore Int        @default(5)
+  /// Cartas-pergunta ainda nao usadas, embaralhadas no inicio da partida.
+  promptDeck  String[]
+  /// Cartas-resposta ainda nao distribuidas.
+  answerDeck  String[]
+  players     Player[]
+  rounds      Round[]
 }
 
 model Player {
   id          String       @id @default(uuid())
   name        String
   gameId      String
-  isHost      Boolean
+  isHost      Boolean      @default(false)
   score       Int          @default(0)
-  Game        Game         @relation(fields: [gameId], references: [id])
+  /// Mao do jogador: cartas-resposta que ele pode jogar.
+  hand        String[]
+  joinedAt    DateTime     @default(now())
+  game        Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
   submissions Submission[]
+  votes       Vote[]
+
+  @@unique([gameId, name])
 }
 
 model Round {
   id          String       @id @default(uuid())
   gameId      String
+  number      Int
   prompt      String
-  submissions Submission[]
+  phase       RoundPhase   @default(SUBMITTING)
   winnerId    String?
-  Game        Game         @relation(fields: [gameId], references: [id])
+  createdAt   DateTime     @default(now())
+  game        Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+  votes       Vote[]
+
+  @@unique([gameId, number])
 }
 
 model Submission {
@@ -40,13 +61,35 @@ model Submission {
   roundId  String
   playerId String
   card     String
-  votes    Int    @default(0)
-  Round    Round  @relation(fields: [roundId], references: [id])
-  Player   Player @relation(fields: [playerId], references: [id])
+  round    Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  votes    Vote[]
+
+  /// Um jogador joga no maximo uma carta por rodada.
+  @@unique([roundId, playerId])
+}
+
+model Vote {
+  id           String     @id @default(uuid())
+  roundId      String
+  voterId      String
+  submissionId String
+  round        Round      @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  voter        Player     @relation(fields: [voterId], references: [id], onDelete: Cascade)
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  /// Um voto por jogador por rodada.
+  @@unique([roundId, voterId])
 }
 
 enum GameStatus {
   LOBBY
   IN_PROGRESS
   FINISHED
+}
+
+enum RoundPhase {
+  SUBMITTING
+  VOTING
+  REVEAL
 }
