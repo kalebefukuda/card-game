@@ -1,38 +1,37 @@
-import { NextResponse } from 'next/server'
+import { GameStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { handle } from '@/lib/apiHandler'
+import { GameError, MAX_PLAYERS } from '@/lib/game'
+import { normalizeName, normalizeCode } from '@/lib/validation'
 
 export async function POST(req: Request) {
-  const { name, code } = await req.json()
+  return handle(async () => {
+    const body = await req.json()
+    const name = normalizeName(body.name)
+    const code = normalizeCode(body.code)
 
-  if (!name || !code) {
-    return NextResponse.json({ error: 'Nome e código são obrigatórios' }, { status: 400 })
-  }
+    const game = await prisma.game.findUnique({
+      where: { code },
+      include: { players: true },
+    })
+    if (!game) throw new GameError('Sala não encontrada', 404)
 
-  const game = await prisma.game.findUnique({
-    where: { code: code.toUpperCase() },
-    include: { players: true },
+    // Reconectar: mesmo nome na mesma sala devolve o jogador que ja existe,
+    // pra quem fechou a aba conseguir voltar pra partida.
+    const existing = game.players.find(
+      (p) => p.name.toLowerCase() === name.toLowerCase()
+    )
+    if (existing) return { code: game.code, playerId: existing.id, rejoined: true }
+
+    if (game.status !== GameStatus.LOBBY)
+      throw new GameError('Essa partida já começou', 409)
+    if (game.players.length >= MAX_PLAYERS)
+      throw new GameError(`Sala cheia (máximo de ${MAX_PLAYERS} jogadores)`, 403)
+
+    const player = await prisma.player.create({
+      data: { name, gameId: game.id, isHost: false },
+    })
+
+    return { code: game.code, playerId: player.id, rejoined: false }
   })
-
-  if (!game) {
-    return NextResponse.json({ error: 'Sala não encontrada' }, { status: 404 })
-  }
-
-  if (game.players.length >= 4) {
-    return NextResponse.json({ error: 'Sala cheia' }, { status: 403 })
-  }
-
-  const nameAlreadyUsed = game.players.some(p => p.name === name)
-  if (nameAlreadyUsed) {
-    return NextResponse.json({ error: 'Nome já utilizado na sala' }, { status: 409 })
-  }
-
-  await prisma.player.create({
-    data: {
-      name,
-      gameId: game.id,
-      isHost: false,
-    },
-  })
-
-  return NextResponse.json({ success: true })
 }
