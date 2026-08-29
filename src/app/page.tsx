@@ -1,149 +1,140 @@
 'use client'
 
-import Image from "next/image"
-import { ArrowRight, Ellipsis, Gamepad, LogOut, Search, WalletCards } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-
+import { ArrowRight, Gamepad, Loader2, WalletCards } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { savePlayerId, loadName, saveName } from '@/lib/session'
+import { MAX_NAME_LENGTH } from '@/lib/constants'
 
 export default function Home() {
-  const [name, setName] = useState('') 
+  const [name, setName] = useState('')
   const [code, setCode] = useState('')
+  const [busy, setBusy] = useState<'create' | 'join' | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  
+  // Reaproveita o ultimo nome usado, pra nao redigitar a cada partida.
+  useEffect(() => setName(loadName()), [])
 
-  const handleCreateRoom = async () => {
-    if (!name) return alert('Informe seu nome')
-    const res = await fetch('/api/create-room', {
-      method: 'POST',
-      body: JSON.stringify({ name }),
-    })
-    const data = await res.json()
-    router.push(`/lobby/${data.code}?name=${name}`)
-  }
-  
-  const handleJoinRoom = async () => {
-    if (!name || !code) return alert('Informe nome e código')
-  
-    const res = await fetch('/api/join-room', {
-      method: 'POST',
-      body: JSON.stringify({ name, code }),
-    })
-  
-    if (!res.ok) {
-      const error = await res.json()
-      alert(error.error || 'Erro ao entrar na sala')
-      return
+  const enterRoom = async (
+    kind: 'create' | 'join',
+    url: string,
+    body: Record<string, string>
+  ) => {
+    if (!name.trim()) return setError('Informe seu nome')
+    setBusy(kind)
+    setError(null)
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, ...body }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Não foi possível entrar na sala')
+        return
+      }
+      saveName(name.trim())
+      savePlayerId(data.code, data.playerId)
+      router.push(`/game/${data.code}`)
+    } catch {
+      setError('Sem conexão com o servidor')
+    } finally {
+      setBusy(null)
     }
-  
-    router.push(`/lobby/${code.toUpperCase()}?name=${name}`)
   }
-  
+
+  const createRoom = () => enterRoom('create', '/api/create-room', {})
+
+  const joinRoom = () => {
+    if (!code.trim()) return setError('Informe o código da partida')
+    return enterRoom('join', '/api/join-room', { code })
+  }
 
   return (
-
     <div className="min-h-screen bg-white">
-      <header className="container mx-auto p-4 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <div className="relative w-10 h-10">
-            <div className="absolute w-8 h-10 bg-white border-2 border-black rotate-[-10deg]"></div>
-            <div className="absolute w-8 h-10 bg-black border-2 border-black rotate-[5deg]"></div>
-          </div>
-          <span className="font-bold text-lg">Cards Just Cards</span>
-        </div>
-
-        <Input
-  placeholder="Seu nome"
-  value={name}
-  onChange={(e) => setName(e.target.value)}
-  className="mb-4 border-2 border-black"
-/>
-
-
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <div className="font-bold">Kalebe</div>
-            <div className="text-xs text-gray-600">kalebefelixdeoliveira@gmail.com</div>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-gray-300 overflow-hidden">
-            <Image
-              src="/placeholder.svg?height=40&width=40"
-              alt="Perfil"
-              width={40}
-              height={40}
-              className="object-cover"
-            />
-          </div>
-        </div>
+      <header className="mx-auto flex max-w-5xl items-center gap-2 p-4">
+        <span className="relative h-10 w-11 shrink-0">
+          <span className="absolute left-0 h-9 w-7 rotate-[-12deg] border-2 border-black bg-white" />
+          <span className="absolute left-3 h-9 w-7 rotate-[8deg] border-2 border-black bg-black" />
+        </span>
+        <span className="text-lg font-bold">Cards Just Cards</span>
       </header>
 
-      <main className="container mx-auto p-4 mt-8 flex flex-col md:flex-row gap-8">
-        <div className="w-full md:w-1/2 space-y-4">
-        <Button
-          onClick={handleCreateRoom}
-          className="w-full h-14 bg-black text-white hover:bg-black/90 rounded-sm flex items-center justify-center gap-2"
-        >
-          <Gamepad />
-          <span className="font-medium">NOVA PARTIDA</span>
-        </Button>
-
-          <Button
-            variant="outline"
-            className="w-full h-14 bg-white text-black border-2 border-black hover:bg-gray-100 rounded-sm flex items-center justify-center gap-2"
-          >
-            <span className="material-icons"><Search /></span>
-            <span className="font-medium">ENCONTRAR PARTIDAS</span>
-          </Button>
-
-          <Button
-           onClick={ () => router.push('/see-cards')}
-            variant="outline"
-            className="w-full h-14 bg-white text-black border-2 border-black hover:bg-gray-100 rounded-sm flex items-center justify-center gap-2"
-          >
-            <span className="material-icons"><WalletCards /></span>
-            <span className="font-medium">VER CARTAS</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            className="w-full h-14 bg-white text-black border-2 border-black hover:bg-gray-100 rounded-sm flex items-center justify-center gap-2"
-          >
-            <span className="material-icons"><Ellipsis /></span>
-            <span className="font-medium">MAIS OPÇÕES</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            className="w-full h-14 bg-white text-black border-2 border-black hover:bg-gray-100 rounded-sm flex items-center justify-center gap-2"
-          >
-            <span className="material-icons"><LogOut /></span>
-            <span className="font-medium">SAIR</span>
-          </Button>
+      <main className="mx-auto max-w-5xl space-y-8 p-4">
+        <div className="space-y-2">
+          <label htmlFor="name" className="text-sm font-bold tracking-widest uppercase">
+            Seu nome
+          </label>
+          <Input
+            id="name"
+            placeholder="Como a mesa vai te chamar"
+            value={name}
+            maxLength={MAX_NAME_LENGTH}
+            onChange={(e) => setName(e.target.value)}
+            className="h-12 max-w-md border-2 border-black focus-visible:ring-0"
+          />
         </div>
 
-        <div className="w-full md:w-1/2">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-2">Entre em uma partida</h2>
-            <p className="text-sm mb-4">
-              Peça para seu amigo enviar o código da partida para que você possa entrar na partida.
+        {error && (
+          <p role="alert" className="border-2 border-black bg-black px-4 py-2 text-sm font-medium text-white">
+            {error}
+          </p>
+        )}
+
+        <div className="flex flex-col gap-8 md:flex-row">
+          <div className="w-full space-y-4 md:w-1/2">
+            <Button
+              onClick={createRoom}
+              disabled={busy !== null}
+              className="flex h-14 w-full items-center justify-center gap-2 rounded-sm bg-black text-white hover:bg-black/90"
+            >
+              {busy === 'create' ? <Loader2 className="animate-spin" /> : <Gamepad />}
+              <span className="font-medium">NOVA PARTIDA</span>
+            </Button>
+
+            <Button
+              onClick={() => router.push('/see-cards')}
+              variant="outline"
+              className="flex h-14 w-full items-center justify-center gap-2 rounded-sm border-2 border-black bg-white text-black hover:bg-gray-100"
+            >
+              <WalletCards />
+              <span className="font-medium">VER CARTAS</span>
+            </Button>
+          </div>
+
+          <div className="w-full md:w-1/2">
+            <h2 className="mb-2 text-2xl font-bold">Entre em uma partida</h2>
+            <p className="mb-4 text-sm">
+              Peça para seu amigo enviar o código da partida para que você possa
+              entrar.
             </p>
 
             <div className="flex">
               <Input
                 placeholder="Código da partida"
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="rounded-r-none border-2 border-black focus-visible:ring-0 focus-visible:ring-offset-0"
+                maxLength={6}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === 'Enter' && joinRoom()}
+                className="rounded-r-none border-2 border-black font-mono tracking-[0.2em] uppercase focus-visible:ring-0 focus-visible:ring-offset-0"
               />
               <Button
-              onClick={handleJoinRoom}
-              className="bg-black text-white hover:bg-black/90 rounded-l-none px-6">
-              ENTRAR <ArrowRight className="ml-1" />
-            </Button>
-
+                onClick={joinRoom}
+                disabled={busy !== null}
+                className="rounded-l-none bg-black px-6 text-white hover:bg-black/90"
+              >
+                {busy === 'join' ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <>
+                    ENTRAR <ArrowRight className="ml-1" />
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </div>
