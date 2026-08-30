@@ -62,7 +62,7 @@ export function GameCard({
       </span>
 
       <span className="mt-2 flex items-center gap-1.5">
-        <Mascot size={18} />
+        <Mascot size={26} variant="full" />
         <span className="text-[7px] font-bold tracking-[0.18em] uppercase">
           Cards Just Cards
         </span>

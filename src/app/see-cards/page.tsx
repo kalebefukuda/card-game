@@ -142,7 +142,7 @@ export default function VerCartas() {
                     {carta.texto}
                   </span>
                   <span className="mt-2 flex items-center gap-1.5 opacity-70">
-                    <Mascot size={18} />
+                    <Mascot size={26} variant="full" />
                     <span className="text-[7px] font-bold tracking-[0.16em] uppercase">
                       Cards Just Cards
                     </span>
