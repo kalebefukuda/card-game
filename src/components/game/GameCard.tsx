@@ -1,6 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { Mascot } from '@/components/brand/Mascot'
 
 type GameCardProps = {
   text: string
@@ -12,7 +13,8 @@ type GameCardProps = {
 }
 
 /**
- * Carta do jogo. Preta = pergunta, branca = resposta, seguindo o baralho fisico.
+ * Carta do jogo. A pergunta e azul e a resposta e branca — no baralho fisico
+ * seriam preta e branca, mas em tela o azul separa melhor sem pesar a pagina.
  * Vira <button> quando ha onClick, pra ficar acessivel via teclado.
  */
 export function GameCard({
@@ -33,41 +35,40 @@ export function GameCard({
       disabled={!interactive}
       aria-pressed={onClick ? selected : undefined}
       className={cn(
-        'group relative flex aspect-[2/3] w-full flex-col justify-between rounded-md border-2 p-3 text-left transition',
+        'group relative flex aspect-[3/4] w-full flex-col justify-between rounded-2xl p-4 text-left',
+        'transition-[transform,box-shadow,border-color] duration-[120ms] ease-out',
         isPrompt
-          ? 'border-black bg-black text-white'
-          : 'border-black bg-white text-black',
-        interactive &&
-          'cursor-pointer hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] focus-visible:-translate-y-1 focus-visible:shadow-[4px_4px_0_0_#000] focus-visible:outline-none',
-        selected && 'ring-4 ring-black ring-offset-2',
-        disabled && !selected && 'opacity-40',
+          ? 'border-b-[5px] border-[var(--prompt-edge)] bg-[var(--prompt)] text-white'
+          : 'border-2 border-b-[5px] border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]',
+        interactive && 'hover:-translate-y-1 hover:border-[var(--brand)]',
+        interactive && 'active:translate-y-[2px] active:border-b-2',
+        selected &&
+          'border-[var(--brand)] ring-4 ring-[var(--brand-soft)] ring-offset-0',
+        disabled && !selected && 'opacity-45',
         !interactive && 'cursor-default'
       )}
     >
-      <span className="text-sm leading-snug font-medium">{text}</span>
+      <span
+        className={cn(
+          'font-bold text-balance',
+          // Texto longo encolhe pra caber sem cortar a piada.
+          text.length > 90
+            ? 'text-[0.8rem] leading-snug'
+            : 'text-[0.95rem] leading-snug'
+        )}
+      >
+        {text}
+      </span>
 
-      <span className="mt-2 flex items-center gap-1">
-        <span className="relative h-4 w-5 shrink-0">
-          <span
-            className={cn(
-              'absolute left-0 h-4 w-3 rotate-[-12deg] border',
-              isPrompt ? 'border-white bg-black' : 'border-black bg-white'
-            )}
-          />
-          <span
-            className={cn(
-              'absolute left-1.5 h-4 w-3 rotate-[8deg] border',
-              isPrompt ? 'border-white bg-white' : 'border-black bg-black'
-            )}
-          />
-        </span>
-        <span className="text-[8px] tracking-wide uppercase opacity-70">
+      <span className="mt-2 flex items-center gap-1.5 opacity-70">
+        <Mascot size={18} />
+        <span className="text-[7px] font-extrabold tracking-[0.16em] uppercase">
           Cards Just Cards
         </span>
       </span>
 
       {badge && (
-        <span className="absolute -top-2 -right-2 rounded-full border-2 border-black bg-white px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase">
+        <span className="absolute -top-2 -right-2 rounded-full bg-[var(--ink)] px-2.5 py-1 text-[10px] font-extrabold tracking-wide text-white uppercase">
           {badge}
         </span>
       )}
