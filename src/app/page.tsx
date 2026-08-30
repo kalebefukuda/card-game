@@ -77,18 +77,17 @@ export default function Home() {
       </header>
 
       <main className="animate-rise mx-auto max-w-lg px-5 pt-10 pb-16">
-        <div className="flex flex-col items-center text-center">
-          <Mascot size={128} variant="full" title="Tico, o mascote" />
-          <h1 className="mt-5 text-[2rem] leading-[1.1] font-bold tracking-[-0.035em]">
-            Quem tem o pior senso de humor da mesa?
-          </h1>
-          <p className="mt-3 max-w-[42ch] font-semibold text-[var(--ink-soft)]">
-            Cada rodada tem uma frase pela metade. Jogue a resposta mais
-            absurda, vote na melhor e some pontos.
-          </p>
+        <div className="flex flex-col items-center">
+          <Mascot size={148} variant="full" title="Tico, o mascote" />
+          {/*
+           * A tela nao tem titulo visivel de proposito: quem chega aqui ja sabe
+           * o que veio fazer. O h1 fica so para leitor de tela e para o
+           * documento nao ficar sem cabecalho.
+           */}
+          <h1 className="sr-only">Cards Just Cards</h1>
         </div>
 
-        <div className="mt-9 space-y-3">
+        <div className="mt-10 space-y-3">
           <label htmlFor="name" className="kicker text-[var(--ink-soft)]">
             Seu nome
           </label>
