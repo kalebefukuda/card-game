@@ -78,8 +78,8 @@ export default function Home() {
 
       <main className="animate-rise mx-auto max-w-lg px-5 pt-10 pb-16">
         <div className="flex flex-col items-center text-center">
-          <Mascot size={104} mood="happy" title="Tico, o mascote" />
-          <h1 className="mt-5 text-[2rem] leading-[1.1] font-extrabold tracking-[-0.035em]">
+          <Mascot size={128} variant="full" title="Tico, o mascote" />
+          <h1 className="mt-5 text-[2rem] leading-[1.1] font-bold tracking-[-0.035em]">
             Quem tem o pior senso de humor da mesa?
           </h1>
           <p className="mt-3 max-w-[42ch] font-semibold text-[var(--ink-soft)]">
@@ -117,8 +117,8 @@ export default function Home() {
           )}
         </Button>
 
-        <div className="mt-10 rounded-2xl border-2 border-[var(--line)] bg-[var(--surface)] p-5">
-          <h2 className="text-xl font-extrabold">Já tem um código?</h2>
+        <div className="mt-10 rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--paper)] p-5">
+          <h2 className="text-xl font-bold">Já tem um código?</h2>
           <p className="mt-1 text-sm font-semibold text-[var(--ink-soft)]">
             Peça para quem criou a partida e digite aqui.
           </p>
@@ -137,7 +137,7 @@ export default function Home() {
               className="roomcode text-center uppercase"
             />
             <Button
-              variant="info"
+              variant="secondary"
               onClick={joinRoom}
               disabled={busy !== null}
               aria-label="Entrar na partida"
@@ -155,7 +155,7 @@ export default function Home() {
         {error && (
           <p
             role="alert"
-            className="mt-4 rounded-2xl bg-[var(--danger)]/10 px-4 py-3 text-center text-sm font-bold text-[var(--danger)]"
+            className="mt-4 rounded-[var(--radius)] bg-black/[0.06] px-4 py-3 text-center text-sm font-bold text-[var(--ink)]"
           >
             {error}
           </p>
