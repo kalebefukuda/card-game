@@ -49,7 +49,7 @@ export default function Image() {
           Cards Just Cards
         </div>
         <div style={{ fontSize: 34, opacity: 0.65, marginTop: 8 }}>
-          Quem tem o pior senso de humor da mesa?
+          Alguém aqui vai se arrepender.
         </div>
       </div>
     ),

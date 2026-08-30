@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Cards Just Cards',
     description:
-      'Crie uma sala, mande o código para a galera e descubra quem tem o pior senso de humor.',
+      'Uma frase pela metade, a sua carta mais errada, e o voto de quem você chama de amigo.',
     type: 'website',
     locale: 'pt_BR',
   },
