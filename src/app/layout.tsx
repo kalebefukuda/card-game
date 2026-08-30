@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from 'next'
-import { Nunito } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import './globals.css'
 
-// Uma familia so. Nunito tem a terminacao arredondada que da o tom acolhedor
-// sem cair no infantil de fonte de desenho animado.
-const nunito = Nunito({
+// Uma familia so. Inter aguenta o peso do titulo com tracking apertado sem
+// virar decoracao — e o oposto do que uma fonte arredondada faria aqui.
+const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '600', '700', '800'],
-  variable: '--font-nunito',
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-inter',
   display: 'swap',
 })
 
@@ -32,14 +32,14 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#58cc02',
+  themeColor: '#000000',
 }
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR" className={nunito.variable}>
+    <html lang="pt-BR" className={inter.variable}>
       <body className="antialiased">{children}</body>
     </html>
   )

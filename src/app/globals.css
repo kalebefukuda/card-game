@@ -1,77 +1,50 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Tema "mesa de bar": acolhedor e arredondado como o Duolingo, mas com UM
-   acento dominante em vez do arco-iris. Verde manda; azul e ouro so aparecem
-   onde carregam significado (carta-pergunta e vitoria).
+   Preto e branco, sem meio-termo. A carta-pergunta e preta e a resposta e
+   branca, como no baralho fisico — a interface toda herda essa regra.
+   Profundidade vem de sombra dura deslocada, nunca de sombra difusa.
 --------------------------------------------------------------------------- */
 
 :root {
-  /* acento 1 - acao. O verde e a unica cor que convida a clicar. */
-  --brand: #58cc02;
-  --brand-edge: #48a800;
-  --brand-soft: #d7ffb8;
+  --ink: #000000;
+  --paper: #ffffff;
 
-  /* acento 2 - a carta-pergunta, que no baralho fisico e a preta */
-  --prompt: #1cb0f6;
-  --prompt-edge: #1899d6;
+  /* cinzas: so para texto secundario e linha fraca, nunca para acao */
+  --ink-soft: #6b6b6b;
+  --line-soft: rgba(0, 0, 0, 0.18);
 
-  /* acento 3 - vitoria, e so isso */
-  --gold: #ffc800;
-
-  --danger: #ff4b4b;
-
-  /* neutros quentes: cinza puro deixa o tema frio demais pro tom do jogo */
-  --ink: #3c3c3c;
-  --ink-soft: #777777;
-  --line: #e5e5e5;
-  --surface: #ffffff;
-  --canvas: #fafaf7;
-
-  /* pelo do Tico */
-  --fur: #c08552;
-  --fur-shade: #a06c3f;
-  --fur-inner: #e8b98c;
-  --fur-face: #f7d9bc;
-  --fur-muzzle: #ffeada;
-
-  --radius: 16px;
+  --border-w: 2px;
+  --shadow-hard: 4px 4px 0 0 var(--ink);
+  --shadow-hard-sm: 3px 3px 0 0 var(--ink);
+  --radius: 6px;
 }
 
 @theme inline {
-  --color-brand: var(--brand);
-  --color-brand-edge: var(--brand-edge);
-  --color-brand-soft: var(--brand-soft);
-  --color-prompt: var(--prompt);
-  --color-gold: var(--gold);
-  --color-danger: var(--danger);
   --color-ink: var(--ink);
+  --color-paper: var(--paper);
   --color-ink-soft: var(--ink-soft);
-  --color-line: var(--line);
-  --color-surface: var(--surface);
-  --color-canvas: var(--canvas);
-  --font-sans: var(--font-nunito);
+  --font-sans: var(--font-inter);
 }
 
 @layer base {
   body {
-    background: var(--canvas);
+    background: var(--paper);
     color: var(--ink);
-    font-family: var(--font-nunito), ui-rounded, system-ui, sans-serif;
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Acabamento, nao extra: o foco tem que ser visivel em tudo que navega. */
+  /* Foco visivel e acabamento, nao extra. Amarelo nao serve aqui: o anel
+     precisa aparecer sobre preto e sobre branco, entao usamos deslocamento. */
   :focus-visible {
-    outline: 3px solid var(--prompt);
-    outline-offset: 2px;
+    outline: 3px solid var(--ink);
+    outline-offset: 3px;
   }
 
   /*
    * <button> nasce com cursor:default no HTML e o preflight do Tailwind nao
-   * mexe nisso. Resolver aqui, na base, em vez de lembrar de escrever
-   * cursor-pointer em cada botao novo — que e exatamente o que a gente esquece.
-   * Botao desabilitado fica de fora de proposito: ele nao convida ao clique.
+   * mexe nisso. Resolver na base evita ter que lembrar em cada botao novo.
    */
   button:not(:disabled),
   [role='tab']:not([aria-disabled='true']),
@@ -79,31 +52,37 @@
     cursor: pointer;
   }
 
-  /* Titulo grande pede tracking negativo — e o que tira a cara de template. */
+  /* Titulo grande com tracking apertado: a assinatura que tira cara de template. */
   h1,
   h2 {
-    letter-spacing: -0.03em;
+    letter-spacing: -0.035em;
   }
 }
 
 @layer utilities {
-  /* Rotulo/kicker: caixa alta pequena so funciona com tracking bem aberto. */
   .kicker {
     font-size: 0.6875rem;
-    font-weight: 800;
-    letter-spacing: 0.18em;
+    font-weight: 700;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
   }
 
-  /* O codigo da sala e pra ser lido em voz alta e digitado por outra pessoa. */
+  /* O codigo da sala e lido em voz alta e digitado por outra pessoa. */
   .roomcode {
     font-variant-ligatures: none;
     letter-spacing: 0.22em;
-    font-weight: 800;
+    font-weight: 700;
+  }
+
+  .shadow-hard {
+    box-shadow: var(--shadow-hard);
+  }
+
+  .shadow-hard-sm {
+    box-shadow: var(--shadow-hard-sm);
   }
 }
 
-/* A unica animacao do tema: entrada curta, sem bounce, sem rotacao. */
 @keyframes rise {
   from {
     opacity: 0;
@@ -116,7 +95,7 @@
 }
 
 .animate-rise {
-  animation: rise 220ms ease-out both;
+  animation: rise 200ms ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {
