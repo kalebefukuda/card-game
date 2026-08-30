@@ -10,7 +10,7 @@ export function Logo({
 }) {
   return (
     <span className="flex items-center gap-2">
-      <Mascot size={size} />
+      <Mascot size={size} variant="full" />
       <span
         className={
           'text-lg leading-none font-extrabold tracking-[-0.02em] text-[var(--ink)]' +

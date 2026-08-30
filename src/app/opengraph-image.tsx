@@ -7,17 +7,15 @@ export const contentType = 'image/png'
 // O mascote entra como data URI: o renderizador de OG nao aceita componente React
 // de SVG, mas aceita <img>. Mesma geometria do icon.svg.
 const MASCOT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
-<circle cx="20" cy="62" r="17" fill="#a06c3f"/><circle cx="20" cy="62" r="9" fill="#e8b98c"/>
-<circle cx="100" cy="62" r="17" fill="#a06c3f"/><circle cx="100" cy="62" r="9" fill="#e8b98c"/>
-<ellipse cx="60" cy="60" rx="42" ry="40" fill="#c08552"/>
-<ellipse cx="60" cy="68" rx="31" ry="29" fill="#f7d9bc"/>
-<path d="M29 47c8-9 20-13 31-13s23 4 31 13c-9-4-20-6-31-6s-22 2-31 6z" fill="#a06c3f"/>
-<circle cx="47" cy="61" r="6" fill="#3c3c3c"/><circle cx="73" cy="61" r="6" fill="#3c3c3c"/>
-<circle cx="49" cy="59" r="2.1" fill="#fff"/><circle cx="75" cy="59" r="2.1" fill="#fff"/>
-<ellipse cx="60" cy="80" rx="18" ry="12" fill="#ffeada"/>
-<ellipse cx="54" cy="76" rx="2.4" ry="3" fill="#3c3c3c" opacity="0.75"/>
-<ellipse cx="66" cy="76" rx="2.4" ry="3" fill="#3c3c3c" opacity="0.75"/>
-<path d="M51 84c3.5 4 14.5 4 18 0" stroke="#3c3c3c" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+<g transform="rotate(-15 46 88)"><rect x="27" y="62" width="38" height="52" rx="5" fill="#fff" stroke="#000" stroke-width="5"/></g>
+<g transform="rotate(15 76 88)"><rect x="57" y="62" width="38" height="52" rx="5" fill="#000" stroke="#000" stroke-width="5"/></g>
+<circle cx="30" cy="40" r="11.5" fill="#000"/><circle cx="30" cy="40" r="4.8" fill="#fff"/>
+<circle cx="90" cy="40" r="11.5" fill="#000"/><circle cx="90" cy="40" r="4.8" fill="#fff"/>
+<ellipse cx="60" cy="42" rx="29" ry="27" fill="#000"/>
+<ellipse cx="60" cy="47" rx="21" ry="19" fill="#fff"/>
+<circle cx="51" cy="43" r="3.6" fill="#000"/><circle cx="69" cy="43" r="3.6" fill="#000"/>
+<ellipse cx="60" cy="56" rx="11" ry="7" fill="#fff" stroke="#000" stroke-width="2.6"/>
+<path d="M55 56c2.5 2.5 7.5 2.5 10 0" stroke="#000" stroke-width="2.4" stroke-linecap="round" fill="none"/>
 </svg>`
 
 export default function Image() {
@@ -33,8 +31,8 @@ export default function Image() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#58cc02',
-          color: '#ffffff',
+          background: '#ffffff',
+          color: '#000000',
           fontFamily: 'sans-serif',
         }}
       >
@@ -50,8 +48,8 @@ export default function Image() {
         >
           Cards Just Cards
         </div>
-        <div style={{ fontSize: 34, opacity: 0.9, marginTop: 8 }}>
-          Quem tem o pior senso de humor da mesa?
+        <div style={{ fontSize: 34, opacity: 0.65, marginTop: 8 }}>
+          Alguém aqui vai se arrepender.
         </div>
       </div>
     ),

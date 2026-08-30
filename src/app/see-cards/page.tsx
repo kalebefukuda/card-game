@@ -54,7 +54,7 @@ export default function VerCartas() {
             <ArrowLeft />
           </Button>
         </Link>
-        <h1 className="text-2xl font-extrabold">O baralho</h1>
+        <h1 className="text-2xl font-bold">O baralho</h1>
       </header>
 
       <main className="animate-rise mx-auto max-w-5xl px-4 py-6">
@@ -85,10 +85,10 @@ export default function VerCartas() {
                 aria-selected={ativa}
                 onClick={() => setFiltro(aba.valor)}
                 className={
-                  'h-11 flex-1 rounded-2xl border-2 text-sm font-extrabold transition-colors ' +
+                  'h-11 flex-1 rounded-[var(--radius)] border-2 text-sm font-bold transition-colors ' +
                   (ativa
-                    ? 'border-[var(--brand-edge)] bg-[var(--brand)] text-white'
-                    : 'border-[var(--line)] bg-[var(--surface)] text-[var(--ink-soft)] hover:bg-[var(--canvas)]')
+                    ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] [--mascot-bg:var(--ink)]'
+                    : 'border-[var(--ink)] bg-[var(--paper)] text-[var(--ink-soft)] hover:bg-black/5')
                 }
               >
                 {aba.rotulo}
@@ -104,9 +104,9 @@ export default function VerCartas() {
 
         {filtradas.length === 0 ? (
           <div className="mt-10 flex flex-col items-center gap-4 text-center">
-            <Mascot size={88} mood="peek" />
+            <Mascot size={96} variant="full" />
             <div>
-              <p className="text-lg font-extrabold">
+              <p className="text-lg font-bold">
                 Nenhuma carta com “{busca}”
               </p>
               <p className="mt-1 font-semibold text-[var(--ink-soft)]">
@@ -125,10 +125,10 @@ export default function VerCartas() {
                 <li
                   key={carta.id}
                   className={
-                    'flex aspect-[3/4] flex-col justify-between rounded-2xl border-2 border-b-[5px] p-4 ' +
+                    'flex aspect-[3/4] flex-col justify-between rounded-[var(--radius)] border-2 border-b-[5px] p-4 ' +
                     (pergunta
-                      ? 'border-[var(--prompt-edge)] bg-[var(--prompt)] text-white'
-                      : 'border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]')
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] [--mascot-bg:var(--ink)]'
+                      : 'border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)]')
                   }
                 >
                   <span
@@ -142,8 +142,8 @@ export default function VerCartas() {
                     {carta.texto}
                   </span>
                   <span className="mt-2 flex items-center gap-1.5 opacity-70">
-                    <Mascot size={18} />
-                    <span className="text-[7px] font-extrabold tracking-[0.16em] uppercase">
+                    <Mascot size={26} variant="full" />
+                    <span className="text-[7px] font-bold tracking-[0.16em] uppercase">
                       Cards Just Cards
                     </span>
                   </span>
