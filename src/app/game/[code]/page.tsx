@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { GameCard } from '@/components/game/GameCard'
 import { Scoreboard } from '@/components/game/Scoreboard'
+import { Mascot } from '@/components/brand/Mascot'
+import { Logo } from '@/components/brand/Logo'
 import { useGameState } from '@/hooks/useGameState'
 import { loadPlayerId, savePlayerId, loadName, saveName } from '@/lib/session'
 import { MAX_NAME_LENGTH, MIN_PLAYERS } from '@/lib/constants'
@@ -32,8 +34,9 @@ export default function GamePage() {
 
   if (!ready || (loading && !state)) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <Loader2 className="animate-spin" />
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-3">
+        <Mascot size={72} />
+        <Loader2 className="animate-spin text-[var(--ink-soft)]" />
       </main>
     )
   }
@@ -41,10 +44,16 @@ export default function GamePage() {
   // Sala inexistente: nao adianta pedir nome.
   if (!state && error) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="text-lg font-medium">{error}</p>
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
+        <Mascot size={88} mood="peek" />
+        <div>
+          <h1 className="text-2xl font-extrabold">{error}</h1>
+          <p className="mt-2 font-semibold text-[var(--ink-soft)]">
+            Confira o código com quem criou a partida — é fácil trocar 0 por O.
+          </p>
+        </div>
         <Link href="/">
-          <Button className="rounded-sm bg-black text-white">
+          <Button variant="secondary">
             <ArrowLeft /> Voltar ao início
           </Button>
         </Link>
@@ -74,34 +83,35 @@ export default function GamePage() {
   const isHost = you.isHost
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 font-bold">
-          <ArrowLeft size={18} />
-          <span className="hidden sm:inline">Cards Just Cards</span>
-        </Link>
+    <div className="min-h-dvh">
+      <header className="sticky top-0 z-10 border-b-2 border-[var(--line)] bg-[var(--canvas)]/95 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+          <Link href="/" aria-label="Voltar ao início">
+            <Logo size={30} compact />
+          </Link>
 
-        <div className="flex items-center gap-3">
-          {round && state.status === 'IN_PROGRESS' && (
-            <span className="text-xs font-bold tracking-widest uppercase">
-              Rodada {round.number}
-            </span>
-          )}
-          <RoomCode code={roomCode} />
+          <div className="flex items-center gap-3">
+            {round && state.status === 'IN_PROGRESS' && (
+              <span className="kicker text-[var(--ink-soft)]">
+                Rodada {round.number}
+              </span>
+            )}
+            <RoomCode code={roomCode} />
+          </div>
         </div>
       </header>
 
       {error && (
         <p
           role="alert"
-          className="border-b-2 border-black bg-black px-4 py-2 text-sm font-medium text-white"
+          className="bg-[var(--danger)] px-4 py-2.5 text-center text-sm font-bold text-white"
         >
           {error}
         </p>
       )}
 
-      <main className="mx-auto grid max-w-6xl gap-6 p-4 md:grid-cols-[1fr_260px]">
-        <section className="order-2 md:order-1">
+      <main className="mx-auto grid max-w-5xl gap-6 px-4 py-6 md:grid-cols-[1fr_260px]">
+        <section className="animate-rise">
           {state.status === 'LOBBY' && (
             <Lobby
               state={state}
@@ -127,7 +137,7 @@ export default function GamePage() {
           )}
         </section>
 
-        <div className="order-1 md:order-2">
+        <div className="md:order-last">
           <Scoreboard state={state} youId={you.id} />
         </div>
       </main>
@@ -155,10 +165,14 @@ function RoomCode({ code }: { code: string }) {
     <button
       onClick={copy}
       title="Copiar link de convite"
-      className="flex items-center gap-2 border-2 border-black px-3 py-1.5 font-mono text-lg font-bold tracking-[0.2em] transition hover:bg-black hover:text-white"
+      className="roomcode flex h-11 items-center gap-2 rounded-2xl border-2 border-b-[4px] border-[var(--line)] bg-[var(--surface)] px-3.5 text-base transition-colors hover:border-[var(--brand)] active:translate-y-[2px] active:border-b-2"
     >
       {code}
-      {copied ? <Check size={16} /> : <Copy size={16} />}
+      {copied ? (
+        <Check size={15} className="text-[var(--brand)]" />
+      ) : (
+        <Copy size={15} className="text-[var(--ink-soft)]" />
+      )}
     </button>
   )
 }
@@ -200,13 +214,14 @@ function JoinPrompt({
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-6">
-      <h1 className="text-center text-2xl font-bold">
-        Entrar na sala{' '}
-        <span className="font-mono tracking-[0.2em]">{code}</span>
-      </h1>
+    <main className="animate-rise mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-5 px-6 text-center">
+      <Mascot size={92} mood="happy" />
+      <div>
+        <h1 className="text-2xl font-extrabold">Entrar na partida</h1>
+        <p className="roomcode mt-1 text-lg text-[var(--ink-soft)]">{code}</p>
+      </div>
 
-      <div className="flex w-full max-w-sm">
+      <div className="w-full space-y-3">
         <Input
           autoFocus
           placeholder="Seu nome"
@@ -214,19 +229,17 @@ function JoinPrompt({
           maxLength={MAX_NAME_LENGTH}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && join()}
-          className="rounded-r-none border-2 border-black focus-visible:ring-0"
         />
-        <Button
-          onClick={join}
-          disabled={busy}
-          className="rounded-l-none bg-black px-6 text-white hover:bg-black/90"
-        >
-          {busy ? <Loader2 className="animate-spin" /> : 'ENTRAR'}
+        <Button size="lg" onClick={join} disabled={busy} className="w-full">
+          {busy ? <Loader2 className="animate-spin" /> : 'Entrar'}
         </Button>
       </div>
 
       {(localError || error) && (
-        <p role="alert" className="text-sm font-medium">
+        <p
+          role="alert"
+          className="w-full rounded-2xl bg-[var(--danger)]/10 px-4 py-3 text-sm font-bold text-[var(--danger)]"
+        >
           {localError ?? error}
         </p>
       )}
@@ -250,50 +263,69 @@ function Lobby({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Sala de espera</h1>
-        <p className="mt-1 text-sm text-black/60">
-          Compartilhe o código do topo com a galera. Primeiro a chegar em{' '}
+        <h1 className="text-3xl font-extrabold">Sala de espera</h1>
+        <p className="mt-1.5 font-semibold text-[var(--ink-soft)]">
+          Toque no código lá em cima para copiar o convite. Primeiro a chegar em{' '}
           {state.targetScore} pontos vence.
         </p>
       </div>
 
-      <ul className="grid gap-2 sm:grid-cols-2">
+      <ul className="grid gap-2.5 sm:grid-cols-2">
         {state.players.map((p) => (
           <li
             key={p.id}
-            className="flex items-center gap-2 border-2 border-black px-3 py-2 font-medium"
+            className="flex items-center gap-2.5 rounded-2xl border-2 border-[var(--line)] bg-[var(--surface)] px-4 py-3 font-bold"
           >
-            <Check size={16} />
-            {p.name}
+            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--brand)] text-white">
+              <Check size={15} strokeWidth={3} />
+            </span>
+            <span className="truncate">{p.name}</span>
             {p.isHost && (
-              <span className="ml-auto text-[10px] tracking-widest uppercase opacity-60">
+              <span className="kicker ml-auto shrink-0 text-[var(--ink-soft)]">
                 host
               </span>
             )}
           </li>
         ))}
+
+        {missing > 0 &&
+          Array.from({ length: missing }).map((_, i) => (
+            <li
+              key={`empty-${i}`}
+              className="flex items-center gap-2.5 rounded-2xl border-2 border-dashed border-[var(--line)] px-4 py-3 font-semibold text-[var(--ink-soft)]"
+            >
+              <span className="size-7 shrink-0 rounded-full border-2 border-dashed border-[var(--line)]" />
+              Esperando alguém…
+            </li>
+          ))}
       </ul>
 
       {isHost ? (
         <div className="space-y-2">
           <Button
+            size="lg"
             onClick={onStart}
             disabled={missing > 0 || pending}
-            className="h-14 w-full rounded-sm bg-black text-white hover:bg-black/90 disabled:opacity-40"
+            className="w-full"
           >
-            {pending ? <Loader2 className="animate-spin" /> : 'INICIAR PARTIDA'}
+            {pending ? <Loader2 className="animate-spin" /> : 'Começar partida'}
           </Button>
           {missing > 0 && (
-            <p className="text-center text-sm text-black/60">
-              Faltam {missing} {missing === 1 ? 'jogador' : 'jogadores'} para
-              começar (mínimo de {MIN_PLAYERS}).
+            <p className="text-center text-sm font-semibold text-[var(--ink-soft)]">
+              {missing === 1
+                ? 'Falta 1 jogador para começar'
+                : `Faltam ${missing} jogadores para começar`}{' '}
+              (mínimo de {MIN_PLAYERS}).
             </p>
           )}
         </div>
       ) : (
-        <p className="border-2 border-dashed border-black/30 px-4 py-6 text-center text-sm text-black/60">
-          Esperando o host iniciar a partida…
-        </p>
+        <div className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-[var(--line)] px-5 py-5 text-left">
+          <Mascot size={40} />
+          <p className="font-semibold text-[var(--ink-soft)]">
+            Esperando o host começar a partida…
+          </p>
+        </div>
       )}
     </div>
   )
@@ -321,18 +353,18 @@ function Round({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-[200px_1fr] sm:items-center">
-        <div className="max-w-[200px]">
+      <div className="grid gap-4 sm:grid-cols-[180px_1fr] sm:items-center">
+        <div className="mx-auto w-[160px] sm:mx-0 sm:w-full">
           <GameCard text={round.prompt} variant="prompt" />
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1.5 text-center sm:text-left">
           {round.phase === 'SUBMITTING' && (
             <>
-              <h1 className="text-2xl font-bold">
+              <h1 className="text-2xl font-extrabold">
                 {youSubmitted ? 'Carta jogada!' : 'Escolha sua carta'}
               </h1>
-              <p className="text-sm text-black/60">
+              <p className="font-semibold text-[var(--ink-soft)]">
                 {round.submittedCount} de {total} jogaram
                 {youSubmitted && ' — esperando o resto da mesa…'}
               </p>
@@ -341,10 +373,10 @@ function Round({
 
           {round.phase === 'VOTING' && (
             <>
-              <h1 className="text-2xl font-bold">
+              <h1 className="text-2xl font-extrabold">
                 {round.yourVoteId ? 'Voto registrado!' : 'Vote na melhor'}
               </h1>
-              <p className="text-sm text-black/60">
+              <p className="font-semibold text-[var(--ink-soft)]">
                 {round.votedCount} de {total} votaram — você não pode votar na
                 sua própria carta.
               </p>
@@ -353,8 +385,8 @@ function Round({
 
           {round.phase === 'REVEAL' && (
             <>
-              <h1 className="text-2xl font-bold">Resultado da rodada</h1>
-              <p className="text-sm text-black/60">
+              <h1 className="text-2xl font-extrabold">Resultado da rodada</h1>
+              <p className="font-semibold text-[var(--ink-soft)]">
                 {isHost
                   ? 'Quando quiser, puxe a próxima rodada.'
                   : 'Esperando o host puxar a próxima rodada…'}
@@ -394,21 +426,30 @@ function Round({
 
       {round.phase === 'REVEAL' && (
         <>
-          <ul className="space-y-2">
+          <ul className="space-y-2.5">
             {round.reveal.map((r) => (
               <li
                 key={r.id}
-                className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-2 px-4 py-3 ${
-                  r.isWinner ? 'border-black bg-black text-white' : 'border-black/20'
-                }`}
+                className={
+                  'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border-2 px-4 py-3.5 ' +
+                  (r.isWinner
+                    ? 'border-[var(--gold)] bg-[var(--gold)]/12'
+                    : 'border-[var(--line)] bg-[var(--surface)]')
+                }
               >
-                {r.isWinner && <Trophy size={16} className="shrink-0" />}
-                <span className="flex-1 font-medium">{r.filled}</span>
-                <span className="text-sm opacity-70">
+                {r.isWinner && (
+                  <Trophy
+                    size={17}
+                    className="shrink-0 text-[var(--gold)]"
+                    aria-label="vencedora"
+                  />
+                )}
+                <span className="flex-1 font-bold">{r.filled}</span>
+                <span className="text-sm font-semibold text-[var(--ink-soft)]">
                   {r.playerName}
                   {r.isMine && ' (você)'}
                 </span>
-                <span className="text-sm font-bold tabular-nums">
+                <span className="text-sm font-extrabold tabular-nums">
                   {r.votes} {r.votes === 1 ? 'voto' : 'votos'}
                 </span>
               </li>
@@ -417,11 +458,12 @@ function Round({
 
           {isHost && (
             <Button
+              size="lg"
               onClick={onNext}
               disabled={pending}
-              className="h-14 w-full rounded-sm bg-black text-white hover:bg-black/90"
+              className="w-full"
             >
-              {pending ? <Loader2 className="animate-spin" /> : 'PRÓXIMA RODADA'}
+              {pending ? <Loader2 className="animate-spin" /> : 'Próxima rodada'}
             </Button>
           )}
         </>
@@ -437,23 +479,24 @@ function Finished({
   state: NonNullable<ReturnType<typeof useGameState>['state']>
   onHome: () => void
 }) {
+  const tie = state.champions.length > 1
+
   return (
-    <div className="space-y-6 text-center">
-      <Trophy size={48} className="mx-auto" />
+    <div className="flex flex-col items-center gap-5 text-center">
+      <Mascot size={104} mood="happy" />
       <div>
-        <h1 className="text-3xl font-bold">
-          {state.champions.length > 1 ? 'Empate!' : 'Temos um vencedor!'}
+        <h1 className="text-3xl font-extrabold">
+          {tie ? 'Empate!' : 'Temos um campeão!'}
         </h1>
-        <p className="mt-2 text-lg">
-          {state.champions.map((c) => c.name).join(' e ')} —{' '}
+        <p className="mt-2 text-lg font-bold">
+          {state.champions.map((c) => c.name).join(' e ')}
+        </p>
+        <p className="font-semibold text-[var(--ink-soft)]">
           {state.champions[0]?.score} pontos
         </p>
       </div>
-      <Button
-        onClick={onHome}
-        className="h-14 w-full rounded-sm bg-black text-white hover:bg-black/90"
-      >
-        VOLTAR AO INÍCIO
+      <Button size="lg" onClick={onHome} className="w-full max-w-xs">
+        Voltar ao início
       </Button>
     </div>
   )
