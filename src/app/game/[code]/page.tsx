@@ -45,9 +45,9 @@ export default function GamePage() {
   if (!state && error) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
-        <Mascot size={88} mood="peek" />
+        <Mascot size={96} variant="full" />
         <div>
-          <h1 className="text-2xl font-extrabold">{error}</h1>
+          <h1 className="text-2xl font-bold">{error}</h1>
           <p className="mt-2 font-semibold text-[var(--ink-soft)]">
             Confira o código com quem criou a partida — é fácil trocar 0 por O.
           </p>
@@ -84,7 +84,7 @@ export default function GamePage() {
 
   return (
     <div className="min-h-dvh">
-      <header className="sticky top-0 z-10 border-b-2 border-[var(--line)] bg-[var(--canvas)]/95 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b-[length:var(--border-w)] border-[var(--ink)] bg-[var(--paper)]/95 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <Link href="/" aria-label="Voltar ao início">
             <Logo size={30} compact />
@@ -104,7 +104,7 @@ export default function GamePage() {
       {error && (
         <p
           role="alert"
-          className="bg-[var(--danger)] px-4 py-2.5 text-center text-sm font-bold text-white"
+          className="bg-[var(--ink)] px-4 py-2.5 text-center text-sm font-bold text-white"
         >
           {error}
         </p>
@@ -165,11 +165,11 @@ function RoomCode({ code }: { code: string }) {
     <button
       onClick={copy}
       title="Copiar link de convite"
-      className="roomcode flex h-11 items-center gap-2 rounded-2xl border-2 border-b-[4px] border-[var(--line)] bg-[var(--surface)] px-3.5 text-base transition-colors hover:border-[var(--brand)] active:translate-y-[2px] active:border-b-2"
+      className="roomcode flex h-11 items-center gap-2 rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--paper)] px-3.5 text-base shadow-hard-sm transition-[transform,box-shadow] duration-[120ms] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
     >
       {code}
       {copied ? (
-        <Check size={15} className="text-[var(--brand)]" />
+        <Check size={15} className="text-[var(--ink)]" />
       ) : (
         <Copy size={15} className="text-[var(--ink-soft)]" />
       )}
@@ -215,9 +215,9 @@ function JoinPrompt({
 
   return (
     <main className="animate-rise mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-5 px-6 text-center">
-      <Mascot size={92} mood="happy" />
+      <Mascot size={96} variant="full" mood="happy" />
       <div>
-        <h1 className="text-2xl font-extrabold">Entrar na partida</h1>
+        <h1 className="text-2xl font-bold">Entrar na partida</h1>
         <p className="roomcode mt-1 text-lg text-[var(--ink-soft)]">{code}</p>
       </div>
 
@@ -238,7 +238,7 @@ function JoinPrompt({
       {(localError || error) && (
         <p
           role="alert"
-          className="w-full rounded-2xl bg-[var(--danger)]/10 px-4 py-3 text-sm font-bold text-[var(--danger)]"
+          className="w-full rounded-[var(--radius)] bg-black/[0.06] px-4 py-3 text-sm font-bold text-[var(--ink)]"
         >
           {localError ?? error}
         </p>
@@ -263,7 +263,7 @@ function Lobby({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-extrabold">Sala de espera</h1>
+        <h1 className="text-3xl font-bold">Sala de espera</h1>
         <p className="mt-1.5 font-semibold text-[var(--ink-soft)]">
           Toque no código lá em cima para copiar o convite. Primeiro a chegar em{' '}
           {state.targetScore} pontos vence.
@@ -274,9 +274,9 @@ function Lobby({
         {state.players.map((p) => (
           <li
             key={p.id}
-            className="flex items-center gap-2.5 rounded-2xl border-2 border-[var(--line)] bg-[var(--surface)] px-4 py-3 font-bold"
+            className="flex items-center gap-2.5 rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--paper)] px-4 py-3 font-bold"
           >
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--brand)] text-white">
+            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--ink)] text-[var(--paper)]">
               <Check size={15} strokeWidth={3} />
             </span>
             <span className="truncate">{p.name}</span>
@@ -292,9 +292,9 @@ function Lobby({
           Array.from({ length: missing }).map((_, i) => (
             <li
               key={`empty-${i}`}
-              className="flex items-center gap-2.5 rounded-2xl border-2 border-dashed border-[var(--line)] px-4 py-3 font-semibold text-[var(--ink-soft)]"
+              className="flex items-center gap-2.5 rounded-[var(--radius)] border-2 border-dashed border-[var(--line-soft)] px-4 py-3 font-semibold text-[var(--ink-soft)]"
             >
-              <span className="size-7 shrink-0 rounded-full border-2 border-dashed border-[var(--line)]" />
+              <span className="size-7 shrink-0 rounded-full border-2 border-dashed border-[var(--line-soft)]" />
               Esperando alguém…
             </li>
           ))}
@@ -320,7 +320,7 @@ function Lobby({
           )}
         </div>
       ) : (
-        <div className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-[var(--line)] px-5 py-5 text-left">
+        <div className="flex items-center gap-3 rounded-[var(--radius)] border-2 border-dashed border-[var(--line-soft)] px-5 py-5 text-left">
           <Mascot size={40} />
           <p className="font-semibold text-[var(--ink-soft)]">
             Esperando o host começar a partida…
@@ -361,7 +361,7 @@ function Round({
         <div className="space-y-1.5 text-center sm:text-left">
           {round.phase === 'SUBMITTING' && (
             <>
-              <h1 className="text-2xl font-extrabold">
+              <h1 className="text-2xl font-bold">
                 {youSubmitted ? 'Carta jogada!' : 'Escolha sua carta'}
               </h1>
               <p className="font-semibold text-[var(--ink-soft)]">
@@ -373,7 +373,7 @@ function Round({
 
           {round.phase === 'VOTING' && (
             <>
-              <h1 className="text-2xl font-extrabold">
+              <h1 className="text-2xl font-bold">
                 {round.yourVoteId ? 'Voto registrado!' : 'Vote na melhor'}
               </h1>
               <p className="font-semibold text-[var(--ink-soft)]">
@@ -385,7 +385,7 @@ function Round({
 
           {round.phase === 'REVEAL' && (
             <>
-              <h1 className="text-2xl font-extrabold">Resultado da rodada</h1>
+              <h1 className="text-2xl font-bold">Resultado da rodada</h1>
               <p className="font-semibold text-[var(--ink-soft)]">
                 {isHost
                   ? 'Quando quiser, puxe a próxima rodada.'
@@ -431,16 +431,16 @@ function Round({
               <li
                 key={r.id}
                 className={
-                  'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border-2 px-4 py-3.5 ' +
+                  'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[var(--radius)] border-2 px-4 py-3.5 ' +
                   (r.isWinner
-                    ? 'border-[var(--gold)] bg-[var(--gold)]/12'
-                    : 'border-[var(--line)] bg-[var(--surface)]')
+                    ? 'border-[var(--ink)] bg-black/[0.06]'
+                    : 'border-[var(--ink)] bg-[var(--paper)]')
                 }
               >
                 {r.isWinner && (
                   <Trophy
                     size={17}
-                    className="shrink-0 text-[var(--gold)]"
+                    className="shrink-0 text-[var(--ink)]"
                     aria-label="vencedora"
                   />
                 )}
@@ -449,7 +449,7 @@ function Round({
                   {r.playerName}
                   {r.isMine && ' (você)'}
                 </span>
-                <span className="text-sm font-extrabold tabular-nums">
+                <span className="text-sm font-bold tabular-nums">
                   {r.votes} {r.votes === 1 ? 'voto' : 'votos'}
                 </span>
               </li>
@@ -483,9 +483,9 @@ function Finished({
 
   return (
     <div className="flex flex-col items-center gap-5 text-center">
-      <Mascot size={104} mood="happy" />
+      <Mascot size={112} variant="full" mood="happy" />
       <div>
-        <h1 className="text-3xl font-extrabold">
+        <h1 className="text-3xl font-bold">
           {tie ? 'Empate!' : 'Temos um campeão!'}
         </h1>
         <p className="mt-2 text-lg font-bold">
