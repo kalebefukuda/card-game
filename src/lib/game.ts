@@ -1,8 +1,8 @@
-import { GameStatus, RoundPhase } from '@prisma/client'
+import { DeckMode, EndCondition, GameStatus, RoundPhase } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { answerCards } from '@/data/answerCards'
 import { promptCards } from '@/data/promptCards'
-import { HAND_SIZE, MIN_PLAYERS } from '@/lib/constants'
+import { MIN_PLAYERS } from '@/lib/constants'
 
 export {
   HAND_SIZE,
@@ -86,7 +86,7 @@ export async function startGame(code: string, playerId: string) {
   let answerDeck = shuffle(answerCards)
 
   const hands = game.players.map((p) => {
-    const { drawn, remaining } = draw(answerDeck, HAND_SIZE, answerCards)
+    const { drawn, remaining } = draw(answerDeck, game.handSize, answerCards)
     answerDeck = remaining
     return { playerId: p.id, hand: drawn }
   })
@@ -212,12 +212,46 @@ async function tallyRound(roundId: string, gameId: string) {
     where: { id: gameId },
     include: { players: true },
   })
-  if (game && game.players.some((p) => p.score >= game.targetScore)) {
+  const round = await prisma.round.findUnique({ where: { id: roundId } })
+
+  if (game && round && isGameOver(game, game.players, round.number)) {
     await prisma.game.update({
       where: { id: gameId },
       data: { status: GameStatus.FINISHED },
     })
   }
+}
+
+/**
+ * Decide se a partida acabou. Concentrado numa funcao so porque as tres regras
+ * podem disparar na mesma apuracao, e espalhar isso pelo codigo e o jeito de
+ * uma delas ser esquecida.
+ */
+function isGameOver(
+  game: {
+    endCondition: EndCondition
+    targetScore: number
+    roundLimit: number
+    deckMode: DeckMode
+  },
+  players: { score: number; hand: string[] }[],
+  roundNumber: number
+) {
+  // Em DEPLETE, ficar sem cartas encerra sempre — inclusive quando ninguem
+  // bateu a pontuacao. Todos esvaziam na mesma rodada, porque cada jogador
+  // joga exatamente uma carta por rodada.
+  if (
+    game.deckMode === DeckMode.DEPLETE &&
+    players.every((p) => p.hand.length === 0)
+  ) {
+    return true
+  }
+
+  if (game.endCondition === EndCondition.ROUND_LIMIT) {
+    return roundNumber >= game.roundLimit
+  }
+
+  return players.some((p) => p.score >= game.targetScore)
 }
 
 /** Host abre a proxima rodada: recompoe as maos e sorteia nova pergunta. */
@@ -235,7 +269,18 @@ export async function nextRound(code: string, playerId: string) {
 
   let answerDeck = [...game.answerDeck]
   const refills = game.players.map((p) => {
-    const missing = HAND_SIZE - p.hand.length
+    // DEPLETE nao repoe nada: a mao inicial e todo o estoque da partida.
+    if (game.deckMode === DeckMode.DEPLETE) return null
+
+    // FRESH troca a mao inteira; o que sobrou nao volta pro baralho de
+    // proposito, senao a carta descartada reaparece na rodada seguinte.
+    if (game.deckMode === DeckMode.FRESH) {
+      const { drawn, remaining } = draw(answerDeck, game.handSize, answerCards)
+      answerDeck = remaining
+      return { playerId: p.id, hand: drawn }
+    }
+
+    const missing = game.handSize - p.hand.length
     if (missing <= 0) return null
     const { drawn, remaining } = draw(answerDeck, missing, answerCards)
     answerDeck = remaining

@@ -1,8 +1,11 @@
+'use client'
+
 import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
+import { playSound, type SoundName } from '@/lib/sound'
 
 /**
  * Botao brutalista: borda preta e sombra dura deslocada. No :active a sombra
@@ -45,14 +48,29 @@ function Button({
   variant,
   size,
   asChild = false,
+  sound = 'click',
+  onClick,
   ...props
 }: React.ComponentProps<'button'> &
-  VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean
+    /** Som do clique. `false` desliga — use quando o pai ja toca o seu. */
+    sound?: SoundName | false
+  }) {
   const Comp = asChild ? Slot : 'button'
+
+  // O som vive aqui e nao em cada tela: botao novo ja nasce com feedback, que
+  // e o mesmo motivo de o cursor estar na camada base do CSS.
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (sound) playSound(sound)
+    onClick?.(event)
+  }
+
   return (
     <Comp
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      onClick={handleClick}
       {...props}
     />
   )

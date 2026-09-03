@@ -31,7 +31,7 @@ export function Scoreboard({
   return (
     <aside className="overflow-hidden rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--paper)]">
       <h2 className="kicker border-b-[length:var(--border-w)] border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-[var(--paper)]">
-        Placar · até {state.targetScore} pts
+        Placar · {objetivo(state)}
       </h2>
 
       <ul>
@@ -82,4 +82,11 @@ export function Scoreboard({
       </ul>
     </aside>
   )
+}
+
+/** O que a partida cobra para acabar, em uma expressao curta. */
+function objetivo(state: GameState) {
+  if (state.deckMode === 'DEPLETE') return `${state.handSize} rodadas`
+  if (state.endCondition === 'ROUND_LIMIT') return `${state.roundLimit} rodadas`
+  return `até ${state.targetScore} pts`
 }

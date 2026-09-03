@@ -1,13 +1,14 @@
 import { prisma } from '@/lib/prisma'
 import { generateRoomCode } from '@/lib/utils'
 import { handle } from '@/lib/apiHandler'
-import { GameError, DEFAULT_TARGET_SCORE } from '@/lib/game'
-import { normalizeName } from '@/lib/validation'
+import { GameError } from '@/lib/game'
+import { normalizeName, normalizeGameOptions } from '@/lib/validation'
 
 export async function POST(req: Request) {
   return handle(async () => {
-    const { name } = await req.json()
-    const playerName = normalizeName(name)
+    const body = (await req.json()) as Record<string, unknown>
+    const playerName = normalizeName(body.name)
+    const options = normalizeGameOptions(body)
 
     // Colisao de codigo e improvavel (36^6), mas nao impossivel: tenta de novo.
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
       const game = await prisma.game.create({
         data: {
           code,
-          targetScore: DEFAULT_TARGET_SCORE,
+          ...options,
           players: { create: { name: playerName, isHost: true } },
         },
         include: { players: true },

@@ -6,6 +6,8 @@ import { ArrowLeft, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Mascot } from '@/components/brand/Mascot'
+import { playSound } from '@/lib/sound'
+import { SoundControl } from '@/components/sound/SoundControl'
 import { answerCards } from '@/data/answerCards'
 import { promptCards } from '@/data/promptCards'
 
@@ -55,6 +57,9 @@ export default function VerCartas() {
           </Button>
         </Link>
         <h1 className="text-2xl font-bold">O baralho</h1>
+        <div className="ml-auto">
+          <SoundControl />
+        </div>
       </header>
 
       <main className="animate-rise mx-auto max-w-5xl px-4 py-6">
@@ -83,7 +88,10 @@ export default function VerCartas() {
                 key={aba.valor}
                 role="tab"
                 aria-selected={ativa}
-                onClick={() => setFiltro(aba.valor)}
+                onClick={() => {
+                  playSound('click')
+                  setFiltro(aba.valor)
+                }}
                 className={
                   'h-11 flex-1 rounded-[var(--radius)] border-2 text-sm font-bold transition-colors ' +
                   (ativa
@@ -144,7 +152,7 @@ export default function VerCartas() {
                   <span className="mt-2 flex items-center gap-1.5 opacity-70">
                     <Mascot size={26} variant="full" />
                     <span className="text-[7px] font-bold tracking-[0.16em] uppercase">
-                      Cards Just Cards
+                      Meu Baralho
                     </span>
                   </span>
                 </li>
