@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import { Mascot } from '@/components/brand/Mascot'
+import { playSound, type SoundName } from '@/lib/sound'
 
 type GameCardProps = {
   text: string
@@ -10,6 +11,8 @@ type GameCardProps = {
   disabled?: boolean
   badge?: string
   onClick?: () => void
+  /** Som do clique: 'card' ao jogar, 'vote' ao votar. */
+  sound?: SoundName
 }
 
 /**
@@ -25,6 +28,7 @@ export function GameCard({
   disabled = false,
   badge,
   onClick,
+  sound = 'card',
 }: GameCardProps) {
   const isPrompt = variant === 'prompt'
   const interactive = !!onClick && !disabled
@@ -32,7 +36,14 @@ export function GameCard({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={
+        onClick
+          ? () => {
+              playSound(sound)
+              onClick()
+            }
+          : undefined
+      }
       disabled={!interactive}
       aria-pressed={onClick ? selected : undefined}
       className={cn(
@@ -64,7 +75,7 @@ export function GameCard({
       <span className="mt-2 flex items-center gap-1.5">
         <Mascot size={26} variant="full" />
         <span className="text-[7px] font-bold tracking-[0.18em] uppercase">
-          Cards Just Cards
+          Meu Baralho
         </span>
       </span>
 

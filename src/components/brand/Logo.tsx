@@ -17,7 +17,7 @@ export function Logo({
           (compact ? ' hidden sm:inline' : '')
         }
       >
-        Cards Just Cards
+        Meu Baralho
       </span>
     </span>
   )

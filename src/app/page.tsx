@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Mascot } from '@/components/brand/Mascot'
 import { Logo } from '@/components/brand/Logo'
+import { SoundControl } from '@/components/sound/SoundControl'
+import {
+  GameOptions,
+  DEFAULT_OPTIONS,
+  optionsConflict,
+  type GameOptionsValue,
+} from '@/components/game/GameOptions'
 import { loadName, saveName, savePlayerId } from '@/lib/session'
 import { MAX_NAME_LENGTH, ROOM_CODE_LENGTH } from '@/lib/constants'
 
@@ -15,6 +22,8 @@ export default function Home() {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState<'create' | 'join' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [options, setOptions] = useState<GameOptionsValue>(DEFAULT_OPTIONS)
+  const [optionsOpen, setOptionsOpen] = useState(false)
   const router = useRouter()
 
   useEffect(() => setName(loadName()), [])
@@ -27,13 +36,18 @@ export default function Home() {
 
   const createRoom = async () => {
     if (needName()) return
+    const conflito = optionsConflict(options)
+    if (conflito) {
+      setOptionsOpen(true)
+      return setError(conflito)
+    }
     setBusy('create')
     setError(null)
     try {
       const res = await fetch('/api/create-room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, ...options }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Não consegui criar a sala.')
@@ -74,6 +88,7 @@ export default function Home() {
     <div className="min-h-dvh">
       <header className="mx-auto flex max-w-lg items-center justify-between px-5 pt-6">
         <Logo />
+        <SoundControl />
       </header>
 
       <main className="animate-rise mx-auto max-w-lg px-5 pt-10 pb-16">
@@ -84,7 +99,7 @@ export default function Home() {
            * o que veio fazer. O h1 fica so para leitor de tela e para o
            * documento nao ficar sem cabecalho.
            */}
-          <h1 className="sr-only">Cards Just Cards</h1>
+          <h1 className="sr-only">Meu Baralho</h1>
         </div>
 
         <div className="mt-10 space-y-3">
@@ -102,6 +117,13 @@ export default function Home() {
             }}
           />
         </div>
+
+        <GameOptions
+          value={options}
+          onChange={setOptions}
+          open={optionsOpen}
+          onToggle={() => setOptionsOpen((v) => !v)}
+        />
 
         <Button
           size="lg"

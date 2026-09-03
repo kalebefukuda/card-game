@@ -19,11 +19,11 @@ const baseUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
-  title: 'Cards Just Cards',
+  title: 'Meu Baralho',
   description:
     'Jogo de cartas para jogar com os amigos: escolha a resposta mais absurda, vote na melhor e some pontos.',
   openGraph: {
-    title: 'Cards Just Cards',
+    title: 'Meu Baralho',
     description:
       'Uma frase pela metade, a sua carta mais errada, e o voto de quem você chama de amigo.',
     type: 'website',

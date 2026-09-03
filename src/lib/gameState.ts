@@ -1,4 +1,4 @@
-import { GameStatus, RoundPhase } from '@prisma/client'
+import { DeckMode, EndCondition, GameStatus, RoundPhase } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { GameError, fillPrompt } from '@/lib/game'
 
@@ -26,7 +26,11 @@ export type RevealView = {
 export type GameState = {
   code: string
   status: GameStatus
+  endCondition: EndCondition
   targetScore: number
+  roundLimit: number
+  deckMode: DeckMode
+  handSize: number
   players: PlayerView[]
   you: {
     id: string
@@ -132,7 +136,11 @@ export async function getGameState(
   return {
     code: game.code,
     status: game.status,
+    endCondition: game.endCondition,
     targetScore: game.targetScore,
+    roundLimit: game.roundLimit,
+    deckMode: game.deckMode,
+    handSize: game.handSize,
     players,
     you: me
       ? {

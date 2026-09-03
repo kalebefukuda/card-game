@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Check, Copy, Loader2, Trophy } from 'lucide-react'
@@ -10,7 +10,10 @@ import { GameCard } from '@/components/game/GameCard'
 import { Scoreboard } from '@/components/game/Scoreboard'
 import { Mascot } from '@/components/brand/Mascot'
 import { Logo } from '@/components/brand/Logo'
+import { playSound } from '@/lib/sound'
+import { SoundControl } from '@/components/sound/SoundControl'
 import { useGameState } from '@/hooks/useGameState'
+import type { RevealView } from '@/lib/gameState'
 import { loadPlayerId, savePlayerId, loadName, saveName } from '@/lib/session'
 import { MAX_NAME_LENGTH, MIN_PLAYERS } from '@/lib/constants'
 
@@ -31,6 +34,47 @@ export default function GamePage() {
     roomCode,
     playerId
   )
+
+  /*
+   * Som das viradas de fase. O estado chega por polling, entao o efeito roda
+   * varias vezes com o mesmo conteudo — a chave de fase guardada num ref e o
+   * que impede o som de repetir a cada resposta. A primeira carga nunca toca:
+   * entrar numa sala nao e um evento.
+   */
+  const cue = useRef<string | null>(null)
+  const knownPlayers = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!state) return
+
+    const key =
+      state.status === 'FINISHED'
+        ? 'finished'
+        : `${state.round?.number ?? 0}:${state.round?.phase ?? 'none'}`
+
+    if (cue.current !== key) {
+      const first = cue.current === null
+      cue.current = key
+
+      if (!first) {
+        if (state.status === 'FINISHED') {
+          playSound('gameWin')
+        } else if (state.round?.phase === 'REVEAL') {
+          const won = state.round.reveal.some((r) => r.isMine && r.isWinner)
+          playSound(won ? 'roundWin' : 'roundLose')
+        } else if (state.round?.phase === 'SUBMITTING') {
+          playSound('start')
+        }
+      }
+    }
+
+    // Alguem entrou na sala: avisa quem esta esperando no lobby.
+    const count = state.players.length
+    if (knownPlayers.current !== null && count > knownPlayers.current) {
+      playSound('join')
+    }
+    knownPlayers.current = count
+  }, [state])
 
   if (!ready || (loading && !state)) {
     return (
@@ -82,6 +126,18 @@ export default function GamePage() {
   const round = state.round
   const isHost = you.isHost
 
+  /*
+   * Quantas rodadas a partida tem, quando isso e conhecido. Em DEPLETE a mao
+   * inicial e o limite real, mesmo com a condicao de fim por pontos — por isso
+   * ela entra aqui e nao so o roundLimit.
+   */
+  const roundsTotal =
+    state.deckMode === 'DEPLETE'
+      ? state.handSize
+      : state.endCondition === 'ROUND_LIMIT'
+        ? state.roundLimit
+        : null
+
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-10 border-b-[length:var(--border-w)] border-[var(--ink)] bg-[var(--paper)]/95 backdrop-blur">
@@ -94,9 +150,11 @@ export default function GamePage() {
             {round && state.status === 'IN_PROGRESS' && (
               <span className="kicker text-[var(--ink-soft)]">
                 Rodada {round.number}
+                {roundsTotal ? ` de ${roundsTotal}` : ''}
               </span>
             )}
             <RoomCode code={roomCode} />
+            <SoundControl />
           </div>
         </div>
       </header>
@@ -416,6 +474,7 @@ function Round({
               key={s.id}
               text={s.card}
               badge={s.isMine ? 'sua' : undefined}
+              sound="vote"
               selected={round.yourVoteId === s.id}
               disabled={s.isMine || !!round.yourVoteId || pending}
               onClick={s.isMine ? undefined : () => onVote(s.id)}
@@ -426,24 +485,19 @@ function Round({
 
       {round.phase === 'REVEAL' && (
         <>
+          <RoundWinner reveal={round.reveal} />
+
           <ul className="space-y-2.5">
-            {round.reveal.map((r) => (
+            {round.reveal
+              .filter((r) => !r.isWinner)
+              .map((r) => (
               <li
                 key={r.id}
                 className={
                   'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[var(--radius)] border-2 px-4 py-3.5 ' +
-                  (r.isWinner
-                    ? 'border-[var(--ink)] bg-black/[0.06]'
-                    : 'border-[var(--ink)] bg-[var(--paper)]')
+                  'border-[var(--ink)] bg-[var(--paper)]'
                 }
               >
-                {r.isWinner && (
-                  <Trophy
-                    size={17}
-                    className="shrink-0 text-[var(--ink)]"
-                    aria-label="vencedora"
-                  />
-                )}
                 <span className="flex-1 font-bold">{r.filled}</span>
                 <span className="text-sm font-semibold text-[var(--ink-soft)]">
                   {r.playerName}
@@ -453,7 +507,7 @@ function Round({
                   {r.votes} {r.votes === 1 ? 'voto' : 'votos'}
                 </span>
               </li>
-            ))}
+              ))}
           </ul>
 
           {isHost && (
@@ -498,6 +552,61 @@ function Finished({
       <Button size="lg" onClick={onHome} className="w-full max-w-xs">
         Voltar ao início
       </Button>
+    </div>
+  )
+}
+
+/**
+ * Destaque do vencedor da rodada.
+ *
+ * A lista plana antiga tratava a carta vencedora como uma linha entre outras —
+ * o momento mais divertido da rodada passava sem enfase. Aqui a carta vem
+ * grande e invertida, com o nome de quem jogou e o ponto somado a vista.
+ * Empate mostra todos os empatados, porque todos pontuam.
+ */
+function RoundWinner({ reveal }: { reveal: RevealView[] }) {
+  const winners = reveal.filter((r) => r.isWinner)
+  if (winners.length === 0) {
+    return (
+      <div className="rounded-[var(--radius)] border-[length:var(--border-w)] border-dashed border-[var(--line-soft)] px-5 py-6 text-center">
+        <p className="font-bold">Ninguém votou nesta rodada.</p>
+        <p className="mt-1 text-sm font-semibold text-[var(--ink-soft)]">
+          Rodada sem ponto para ninguém.
+        </p>
+      </div>
+    )
+  }
+
+  const empate = winners.length > 1
+
+  return (
+    <div className="animate-rise rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--ink)] p-5 text-[var(--paper)] shadow-hard [--mascot-bg:var(--ink)]">
+      <p className="kicker flex items-center gap-2 opacity-70">
+        <Trophy size={14} />
+        {empate ? 'Empate na rodada' : 'Vencedora da rodada'}
+      </p>
+
+      <div className="mt-3 space-y-4">
+        {winners.map((w) => (
+          <div key={w.id}>
+            <p className="text-xl leading-snug font-bold text-balance">
+              {w.filled}
+            </p>
+            <p className="mt-2 flex flex-wrap items-baseline gap-x-2 text-sm font-bold">
+              <span className="text-base">
+                {w.playerName}
+                {w.isMine && ' (você)'}
+              </span>
+              <span className="opacity-70">
+                {w.votes} {w.votes === 1 ? 'voto' : 'votos'}
+              </span>
+              <span className="ml-auto rounded-full bg-[var(--paper)] px-2.5 py-1 text-xs font-bold text-[var(--ink)]">
+                +1 ponto
+              </span>
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
