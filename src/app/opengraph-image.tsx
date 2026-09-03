@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og'
 
-export const alt = 'Cards Just Cards — jogo de cartas para jogar com os amigos'
+export const alt = 'Meu Baralho — jogo de cartas para jogar com os amigos'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
@@ -46,7 +46,7 @@ export default function Image() {
             marginTop: 24,
           }}
         >
-          Cards Just Cards
+          Meu Baralho
         </div>
         <div style={{ fontSize: 34, opacity: 0.65, marginTop: 8 }}>
           Alguém aqui vai se arrepender.
