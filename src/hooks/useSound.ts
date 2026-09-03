@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   getSoundState,
   initSound,
+  prepareSound,
   playSound,
   setMuted,
   setVolume,
@@ -26,6 +27,9 @@ export function useSound() {
 
   useEffect(() => {
     setState(initSound())
+    // Baixa e decodifica os arquivos ja na montagem, para o PRIMEIRO clique
+    // sair com o som gravado e nao com a sintese de reserva.
+    prepareSound()
     const unsubscribe = subscribeSound(setState)
 
     const unlock = () => unlockSound()

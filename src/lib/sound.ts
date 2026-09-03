@@ -195,35 +195,59 @@ export function toggleMuted() {
 }
 
 /**
- * Cria (ou retoma) o contexto. Precisa rodar dentro de um gesto do usuario —
- * chamado no primeiro pointerdown da pagina e tambem em cada play, porque o
- * navegador pode suspender o contexto quando a aba perde o foco.
+ * Cria o contexto sem tentar iniciar o audio. Um AudioContext pode nascer
+ * suspenso sem gesto do usuario, e e isso que permite decodificar os arquivos
+ * antes de qualquer clique.
  */
-export function unlockSound() {
+function ensureContext() {
   if (typeof window === 'undefined') return null
   initSound()
+  if (ctx) return ctx
 
-  if (!ctx) {
-    const Ctor =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext
-    if (!Ctor) return null
-    ctx = new Ctor()
-    master = ctx.createGain()
-    master.gain.value = state.muted ? 0 : state.volume
-    master.connect(ctx.destination)
-  }
+  const Ctor =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext
+  if (!Ctor) return null
 
-  if (ctx.state === 'suspended') void ctx.resume()
-  void preloadSamples(ctx)
+  ctx = new Ctor()
+  master = ctx.createGain()
+  master.gain.value = state.muted ? 0 : state.volume
+  master.connect(ctx.destination)
   return ctx
 }
 
 /**
- * Decodifica os arquivos uma vez, no primeiro gesto. Decodificar na hora do
- * clique atrasaria o feedback justamente no primeiro clique, que e o que o
- * jogador mais nota.
+ * Prepara o audio na montagem da pagina, sem esperar gesto nenhum.
+ *
+ * Isto existe por causa de um bug real: quando a decodificacao so comecava no
+ * primeiro gesto, o proprio clique que a disparava tocava a sintese, e o som
+ * gravado so aparecia a partir do segundo. Decodificar cedo faz o primeiro
+ * clique ja sair certo.
+ */
+export function prepareSound() {
+  const audio = ensureContext()
+  if (audio) void preloadSamples(audio)
+  return audio
+}
+
+/**
+ * Retoma o contexto. Precisa rodar dentro de um gesto do usuario — chamado no
+ * primeiro pointerdown e tambem em cada play, porque o navegador suspende o
+ * contexto quando a aba perde o foco.
+ */
+export function unlockSound() {
+  const audio = ensureContext()
+  if (!audio) return null
+  if (audio.state === 'suspended') void audio.resume()
+  void preloadSamples(audio)
+  return audio
+}
+
+/**
+ * Decodifica cada arquivo uma vez so. Roda na montagem da pagina, nao no
+ * clique: decodificar na hora do clique atrasa o feedback justamente no
+ * primeiro, que e o que o jogador mais nota.
  */
 async function preloadSamples(audio: AudioContext) {
   for (const [name, file] of Object.entries(FILES) as [
