@@ -94,6 +94,23 @@ const RECIPES: Record<SoundName, Tone[]> = {
   ],
 }
 
+/**
+ * Sons que vem de arquivo, em `public/sounds`.
+ *
+ * Arquivo ganha da sintese quando existe: um pop gravado tem textura que
+ * oscilador nao imita. A sintese continua como rede de seguranca — enquanto o
+ * arquivo nao decodificou, o clique ainda responde, so com timbre diferente.
+ *
+ * Estes ficam no repo, e nao no Storage, porque sao poucos, minusculos e nunca
+ * mudam sem deploy. Som de rodada, que o host vai trocar, e outro caso.
+ */
+const FILES: Partial<Record<SoundName, { url: string; gain?: number }>> = {
+  click: { url: '/sounds/click.mp3', gain: 0.9 },
+}
+
+const buffers = new Map<SoundName, AudioBuffer>()
+const pending = new Map<SoundName, Promise<void>>()
+
 const STORAGE_KEY = 'mb:sound'
 const DEFAULT_VOLUME = 0.6
 
@@ -199,7 +216,51 @@ export function unlockSound() {
   }
 
   if (ctx.state === 'suspended') void ctx.resume()
+  void preloadSamples(ctx)
   return ctx
+}
+
+/**
+ * Decodifica os arquivos uma vez, no primeiro gesto. Decodificar na hora do
+ * clique atrasaria o feedback justamente no primeiro clique, que e o que o
+ * jogador mais nota.
+ */
+async function preloadSamples(audio: AudioContext) {
+  for (const [name, file] of Object.entries(FILES) as [
+    SoundName,
+    { url: string; gain?: number },
+  ][]) {
+    if (buffers.has(name) || pending.has(name)) continue
+
+    const task = (async () => {
+      try {
+        const res = await fetch(file.url)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        buffers.set(name, await audio.decodeAudioData(await res.arrayBuffer()))
+      } catch {
+        // Falhou baixar ou decodificar: a sintese cobre o som. Nao ha o que
+        // avisar ao jogador — som e feedback, nao funcionalidade.
+      } finally {
+        pending.delete(name)
+      }
+    })()
+
+    pending.set(name, task)
+  }
+}
+
+function playSample(audio: AudioContext, out: GainNode, name: SoundName) {
+  const buffer = buffers.get(name)
+  if (!buffer) return false
+
+  const source = audio.createBufferSource()
+  const gain = audio.createGain()
+  source.buffer = buffer
+  gain.gain.value = FILES[name]?.gain ?? 1
+  source.connect(gain)
+  gain.connect(out)
+  source.start()
+  return true
 }
 
 /** Toca um som pelo nome. Silencioso e seguro se o audio nao estiver liberado. */
@@ -210,6 +271,10 @@ export function playSound(name: SoundName) {
 
   const audio = unlockSound()
   if (!audio || !master || audio.state !== 'running') return
+
+  // Arquivo primeiro; a sintese abaixo cobre quem nao tem arquivo e o intervalo
+  // entre o primeiro gesto e o fim da decodificacao.
+  if (playSample(audio, master, name)) return
 
   const recipe = RECIPES[name]
   const now = audio.currentTime
