@@ -3,26 +3,35 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   // O Supabase serve a app pelo pooler (pgbouncer), mas as migrations exigem
   // conexao direta. Em dev local as duas apontam pro mesmo Postgres.
   directUrl = env("DIRECT_URL")
 }
 
 model Game {
-  id          String     @id @default(uuid())
-  code        String     @unique
-  createdAt   DateTime   @default(now())
-  status      GameStatus @default(LOBBY)
-  /// Pontos necessarios para vencer a partida.
-  targetScore Int        @default(5)
+  id           String       @id @default(uuid())
+  code         String       @unique
+  createdAt    DateTime     @default(now())
+  status       GameStatus   @default(LOBBY)
+  /// Como a partida acaba. As duas condicoes sao exclusivas de proposito:
+  /// juntas elas se contradizem quando uma dispara antes da outra.
+  endCondition EndCondition @default(TARGET_SCORE)
+  /// Pontos para vencer. Usado quando endCondition = TARGET_SCORE.
+  targetScore  Int          @default(5)
+  /// Rodadas da partida. Usado quando endCondition = ROUND_LIMIT.
+  roundLimit   Int          @default(8)
+  /// Como a mao e reabastecida entre rodadas.
+  deckMode     DeckMode     @default(REFILL)
+  /// Cartas na mao. Em DEPLETE, define quantas rodadas a partida aguenta.
+  handSize     Int          @default(7)
   /// Cartas-pergunta ainda nao usadas, embaralhadas no inicio da partida.
-  promptDeck  String[]
+  promptDeck   String[]
   /// Cartas-resposta ainda nao distribuidas.
-  answerDeck  String[]
-  players     Player[]
-  rounds      Round[]
+  answerDeck   String[]
+  players      Player[]
+  rounds       Round[]
 }
 
 model Player {
@@ -80,6 +89,22 @@ model Vote {
 
   /// Um voto por jogador por rodada.
   @@unique([roundId, voterId])
+}
+
+enum EndCondition {
+  /// Vence quem chegar primeiro a targetScore.
+  TARGET_SCORE
+  /// Acaba na rodada roundLimit; vence o maior placar.
+  ROUND_LIMIT
+}
+
+enum DeckMode {
+  /// Classico: joga uma carta, compra uma.
+  REFILL
+  /// Mao inteira nova a cada rodada.
+  FRESH
+  /// Mao inicial que so diminui. Acabar as cartas encerra a partida.
+  DEPLETE
 }
 
 enum GameStatus {

@@ -1,0 +1,11 @@
+-- CreateEnum
+CREATE TYPE "EndCondition" AS ENUM ('TARGET_SCORE', 'ROUND_LIMIT');
+
+-- CreateEnum
+CREATE TYPE "DeckMode" AS ENUM ('REFILL', 'FRESH', 'DEPLETE');
+
+-- AlterTable
+ALTER TABLE "Game" ADD COLUMN     "deckMode" "DeckMode" NOT NULL DEFAULT 'REFILL',
+ADD COLUMN     "endCondition" "EndCondition" NOT NULL DEFAULT 'TARGET_SCORE',
+ADD COLUMN     "handSize" INTEGER NOT NULL DEFAULT 7,
+ADD COLUMN     "roundLimit" INTEGER NOT NULL DEFAULT 8;
