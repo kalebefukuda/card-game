@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
+import grupo from '../../public/time.png'
 import { ArrowRight, Loader2, WalletCards } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Mascot } from '@/components/brand/Mascot'
 import { Logo } from '@/components/brand/Logo'
 import { SoundControl } from '@/components/sound/SoundControl'
 import {
@@ -93,13 +94,25 @@ export default function Home() {
 
       <main className="animate-rise mx-auto max-w-lg px-5 pt-10 pb-16">
         <div className="flex flex-col items-center">
-          <Mascot size={148} variant="full" title="Tico, o mascote" />
           {/*
-           * A tela nao tem titulo visivel de proposito: quem chega aqui ja sabe
-           * o que veio fazer. O h1 fica so para leitor de tela e para o
-           * documento nao ficar sem cabecalho.
+           * A arte vem sem texto de proposito. Gerador de imagem nao desenha
+           * letra de forma confiavel — come borda, erra espacamento, muda o
+           * traco a cada tentativa. O nome entra aqui como texto de verdade:
+           * nitido em qualquer tela, na fonte do app, e editavel sem regerar
+           * a imagem.
            */}
-          <h1 className="sr-only">Meu Baralho</h1>
+          <Image
+            src={grupo}
+            alt="Os cinco amigos que jogam Meu Baralho, um deles segurando o celular com o Tico na tela"
+            priority
+            placeholder="blur"
+            sizes="(max-width: 512px) 100vw, 512px"
+            className="w-full"
+          />
+
+          <h1 className="-mt-3 text-center text-[2.75rem] leading-[0.95] font-extrabold tracking-[-0.045em] uppercase">
+            Meu Baralho
+          </h1>
         </div>
 
         <div className="mt-10 space-y-3">
