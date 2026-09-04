@@ -310,7 +310,7 @@ function LeaveDialog({
 function Abandoned({ onHome }: { onHome: () => void }) {
   return (
     <div className="flex flex-col items-center gap-5 text-center">
-      <Mascot size={104} />
+      <Mark size={104} />
       <div>
         <h1 className="text-3xl font-extrabold">O host saiu</h1>
         <p className="mt-2 font-semibold text-[var(--ink-soft)]">
