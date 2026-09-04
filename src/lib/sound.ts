@@ -1,14 +1,14 @@
 /**
- * Som sintetizado na hora, sem arquivo nenhum.
+ * Audio do jogo: arquivo quando existe um, sintese quando nao.
  *
- * Por que nao MP3 para a interface: cada clique viraria uma requisicao e um
- * asset pra versionar, e o atraso do primeiro play estraga o feedback. Um
- * oscilador com envelope custa microssegundos, nao precisa de licenca e da
- * controle exato de timbre e volume.
+ * Todo evento tem uma receita sintetizada. Quem tambem tem arquivo em `FILES`
+ * toca o arquivo; o resto continua saindo de oscilador. Isso mantem o jogo
+ * sonoro desde o primeiro dia e deixa trocar som a som, sem precisar de um
+ * pacote completo para comecar.
  *
  * Navegador nenhum deixa tocar audio antes de o usuario interagir com a pagina
- * (politica de autoplay), por isso o contexto nasce suspenso e `unlock()` roda
- * no primeiro gesto.
+ * (politica de autoplay), por isso o contexto nasce suspenso e so `resume()`
+ * precisa de gesto — decodificar, nao.
  */
 
 type Tone = {
@@ -106,6 +106,19 @@ const RECIPES: Record<SoundName, Tone[]> = {
  */
 const FILES: Partial<Record<SoundName, { url: string; gain?: number }>> = {
   click: { url: '/sounds/click.mp3', gain: 0.9 },
+
+  /*
+   * Os ganhos abaixo nao sao chute: cada arquivo teve o RMS medido e foi
+   * nivelado para ficar cerca de duas vezes acima do clique — evento merece
+   * presenca, tique de interface nao. Sem isso o gemidinho sairia quatro vezes
+   * mais alto que o resto, e ele ja vem picando em 1.0 no arquivo original.
+   *
+   * Ao trocar um arquivo, remeca o RMS em vez de reaproveitar o ganho antigo.
+   */
+  roundWin: { url: '/sounds/faaahh.mp3', gain: 0.82 },
+  roundLose: { url: '/sounds/chora-nao-vagabunda-meme.mp3', gain: 1 },
+  gameWin: { url: '/sounds/ai-paje.mp3', gain: 1 },
+  join: { url: '/sounds/gemidinho.mp3', gain: 0.48 },
 }
 
 const buffers = new Map<SoundName, AudioBuffer>()
