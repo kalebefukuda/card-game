@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { GameCard } from '@/components/game/GameCard'
 import { SoundCard } from '@/components/game/SoundCard'
 import { Scoreboard } from '@/components/game/Scoreboard'
-import { Mascot } from '@/components/brand/Mascot'
+import { Mark } from '@/components/brand/Mark'
 import { Logo } from '@/components/brand/Logo'
 import { playSound, playSoundCard, stopSoundCard } from '@/lib/sound'
 import { SoundControl } from '@/components/sound/SoundControl'
@@ -80,7 +80,7 @@ export default function GamePage() {
   if (!ready || (loading && !state)) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-3">
-        <Mascot size={72} />
+        <Mark size={72} />
         <Loader2 className="animate-spin text-[var(--ink-soft)]" />
       </main>
     )
@@ -90,7 +90,7 @@ export default function GamePage() {
   if (!state && error) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
-        <Mascot size={96} variant="full" />
+        <Mark size={96} />
         <div>
           <h1 className="text-2xl font-bold">{error}</h1>
           <p className="mt-2 font-semibold text-[var(--ink-soft)]">
@@ -275,7 +275,7 @@ function JoinPrompt({
 
   return (
     <main className="animate-rise mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-5 px-6 text-center">
-      <Mascot size={96} variant="full" mood="happy" />
+      <Mark size={96} />
       <div>
         <h1 className="text-2xl font-bold">Entrar na partida</h1>
         <p className="roomcode mt-1 text-lg text-[var(--ink-soft)]">{code}</p>
@@ -381,7 +381,7 @@ function Lobby({
         </div>
       ) : (
         <div className="flex items-center gap-3 rounded-[var(--radius)] border-2 border-dashed border-[var(--line-soft)] px-5 py-5 text-left">
-          <Mascot size={40} />
+          <Mark size={40} />
           <p className="font-semibold text-[var(--ink-soft)]">
             Esperando o host começar a partida…
           </p>
@@ -580,7 +580,7 @@ function Finished({
 
   return (
     <div className="flex flex-col items-center gap-5 text-center">
-      <Mascot size={112} variant="full" mood="happy" />
+      <Mark size={112} />
       <div>
         <h1 className="text-3xl font-bold">
           {tie ? 'Empate!' : 'Temos um campeão!'}
@@ -623,7 +623,7 @@ function RoundWinner({ reveal }: { reveal: RevealView[] }) {
   const empate = winners.length > 1
 
   return (
-    <div className="animate-rise rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--ink)] p-5 text-[var(--paper)] shadow-hard [--mascot-bg:var(--ink)]">
+    <div className="animate-rise rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--ink)] p-5 text-[var(--paper)] shadow-hard [--mark-invert:1]">
       <p className="kicker flex items-center gap-2 opacity-70">
         <Trophy size={14} />
         {empate ? 'Empate na rodada' : 'Vencedora da rodada'}

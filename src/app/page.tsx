@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
-import grupo from '../../public/time.png'
 import { ArrowRight, Loader2, WalletCards } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Logo } from '@/components/brand/Logo'
+import { Mark } from '@/components/brand/Mark'
 import { SoundControl } from '@/components/sound/SoundControl'
 import {
   GameOptions,
@@ -94,25 +93,17 @@ export default function Home() {
 
       <main className="animate-rise mx-auto max-w-lg px-5 pt-10 pb-16">
         <div className="flex flex-col items-center">
-          {/*
-           * A arte vem sem texto de proposito. Gerador de imagem nao desenha
-           * letra de forma confiavel — come borda, erra espacamento, muda o
-           * traco a cada tentativa. O nome entra aqui como texto de verdade:
-           * nitido em qualquer tela, na fonte do app, e editavel sem regerar
-           * a imagem.
-           */}
-          <Image
-            src={grupo}
-            alt="Os cinco amigos que jogam Meu Baralho, um deles segurando o celular com o Tico na tela"
+          <Mark
+            size={200}
             priority
-            placeholder="blur"
-            sizes="(max-width: 512px) 100vw, 512px"
-            className="w-full"
+            alt="Meu Baralho"
+            className="w-full max-w-[420px] object-contain"
           />
-
-          <h1 className="-mt-3 text-center text-[2.75rem] leading-[0.95] font-extrabold tracking-[-0.045em] uppercase">
-            Meu Baralho
-          </h1>
+          {/*
+           * Sem titulo visivel: a marca ja e a identidade da tela. O h1 fica
+           * para leitor de tela e para o documento nao ficar sem cabecalho.
+           */}
+          <h1 className="sr-only">Meu Baralho</h1>
         </div>
 
         <div className="mt-10 space-y-3">
