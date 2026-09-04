@@ -10,6 +10,7 @@ import {
   SCORE_RANGE,
   DEFAULT_TARGET_SCORE,
   DEFAULT_ROUND_LIMIT,
+  SOUND_EVERY_RANGE,
 } from '@/lib/constants'
 
 /** Nome de jogador: sem espacos nas pontas, nao vazio e com tamanho limitado. */
@@ -89,6 +90,17 @@ export function normalizeGameOptions(body: Record<string, unknown>) {
   )
   const handSize = inteiroNoIntervalo(body.handSize, HAND_RANGE, 'A mao', HAND_SIZE)
 
+  // 0 e o desligado, e por isso escapa da faixa: a faixa vale so quando ligado.
+  const soundEvery =
+    body.soundEvery === undefined || body.soundEvery === null || Number(body.soundEvery) === 0
+      ? 0
+      : inteiroNoIntervalo(
+          body.soundEvery,
+          SOUND_EVERY_RANGE,
+          'A frequencia da rodada de som',
+          0
+        )
+
   if (
     deckMode === DeckMode.DEPLETE &&
     endCondition === EndCondition.ROUND_LIMIT &&
@@ -101,5 +113,5 @@ export function normalizeGameOptions(body: Record<string, unknown>) {
     )
   }
 
-  return { endCondition, targetScore, roundLimit, deckMode, handSize }
+  return { endCondition, targetScore, roundLimit, deckMode, handSize, soundEvery }
 }
