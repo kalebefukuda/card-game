@@ -1,8 +1,14 @@
-import { DeckMode, EndCondition, GameStatus, RoundPhase } from '@prisma/client'
+import {
+  DeckMode,
+  EndCondition,
+  GameStatus,
+  RoundKind,
+  RoundPhase,
+} from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { answerCards } from '@/data/answerCards'
 import { promptCards } from '@/data/promptCards'
-import { MIN_PLAYERS } from '@/lib/constants'
+import { MIN_PLAYERS, SOUND_HAND_SIZE } from '@/lib/constants'
 
 export {
   HAND_SIZE,
@@ -71,6 +77,49 @@ function requirePlayer<T extends { id: string }>(
   return player
 }
 
+/** Uma rodada a cada `soundEvery` e de som. 0 desliga. */
+function roundKind(soundEvery: number, number: number): RoundKind {
+  return soundEvery > 0 && number % soundEvery === 0
+    ? RoundKind.SOUND
+    : RoundKind.TEXT
+}
+
+/**
+ * Reparte a biblioteca de sons entre os jogadores, sem repetir entre eles.
+ *
+ * A mao de som nao e consumida ao longo da partida: com uma biblioteca de
+ * poucas dezenas, gastar uma carta por rodada esgotaria em duas ou tres. Os
+ * seus sons sao seus a partida inteira e voce escolhe o melhor para cada
+ * pergunta — o que tambem garante que dois jogadores nunca tenham o mesmo som.
+ */
+async function dealSoundHands(soundEvery: number, playerCount: number) {
+  if (soundEvery <= 0) return []
+
+  const library = await prisma.soundCard.findMany({
+    where: { active: true },
+    select: { id: true },
+  })
+
+  if (library.length < playerCount) {
+    throw new GameError(
+      `A biblioteca tem ${library.length} som(ns) e a sala tem ${playerCount} ` +
+        'jogadores. Suba mais sons ou desligue a rodada de som.',
+      409
+    )
+  }
+
+  // Cabe menos que o ideal? Reparte o que da, em vez de repetir som na mesa.
+  const perPlayer = Math.min(
+    SOUND_HAND_SIZE,
+    Math.floor(library.length / playerCount)
+  )
+  const pool = shuffle(library.map((s) => s.id))
+
+  return Array.from({ length: playerCount }, (_, i) =>
+    pool.slice(i * perPlayer, (i + 1) * perPlayer)
+  )
+}
+
 /** Host inicia a partida: embaralha, distribui as maos e abre a rodada 1. */
 export async function startGame(code: string, playerId: string) {
   const game = await loadGame(code)
@@ -85,10 +134,12 @@ export async function startGame(code: string, playerId: string) {
   const promptDeck = shuffle(promptCards)
   let answerDeck = shuffle(answerCards)
 
-  const hands = game.players.map((p) => {
+  const soundHands = await dealSoundHands(game.soundEvery, game.players.length)
+
+  const hands = game.players.map((p, i) => {
     const { drawn, remaining } = draw(answerDeck, game.handSize, answerCards)
     answerDeck = remaining
-    return { playerId: p.id, hand: drawn }
+    return { playerId: p.id, hand: drawn, soundHand: soundHands[i] ?? [] }
   })
 
   const prompt = promptDeck.shift() as string
@@ -97,7 +148,7 @@ export async function startGame(code: string, playerId: string) {
     ...hands.map((h) =>
       prisma.player.update({
         where: { id: h.playerId },
-        data: { hand: h.hand, score: 0 },
+        data: { hand: h.hand, soundHand: h.soundHand, score: 0 },
       })
     ),
     prisma.game.update({
@@ -105,13 +156,23 @@ export async function startGame(code: string, playerId: string) {
       data: { status: GameStatus.IN_PROGRESS, promptDeck, answerDeck },
     }),
     prisma.round.create({
-      data: { gameId: game.id, number: 1, prompt, phase: RoundPhase.SUBMITTING },
+      data: {
+        gameId: game.id,
+        number: 1,
+        prompt,
+        kind: roundKind(game.soundEvery, 1),
+        phase: RoundPhase.SUBMITTING,
+      },
     }),
   ])
 }
 
 /** Jogador joga uma carta da mao. Quando todos jogaram, a rodada vai pra votacao. */
-export async function submitCard(code: string, playerId: string, card: string) {
+export async function submitCard(
+  code: string,
+  playerId: string,
+  input: { card?: string; soundCardId?: string }
+) {
   const game = await loadGame(code)
   const player = requirePlayer(game.players, playerId)
   const round = game.rounds[0]
@@ -120,24 +181,50 @@ export async function submitCard(code: string, playerId: string, card: string) {
     throw new GameError('A partida não está em andamento', 409)
   if (round.phase !== RoundPhase.SUBMITTING)
     throw new GameError('A fase de jogar cartas já terminou', 409)
-  if (!player.hand.includes(card))
-    throw new GameError('Essa carta não está na sua mão', 400)
 
   const alreadyPlayed = await prisma.submission.findUnique({
     where: { roundId_playerId: { roundId: round.id, playerId: player.id } },
   })
   if (alreadyPlayed) throw new GameError('Você já jogou nesta rodada', 409)
 
-  // Tira a carta da mao apenas na primeira ocorrencia (pode haver duplicatas).
-  const hand = [...player.hand]
-  hand.splice(hand.indexOf(card), 1)
+  if (round.kind === RoundKind.SOUND) {
+    const { soundCardId } = input
+    if (!soundCardId) throw new GameError('Escolha uma carta de som', 400)
+    if (!player.soundHand.includes(soundCardId))
+      throw new GameError('Esse som não está na sua mão', 400)
 
-  await prisma.$transaction([
-    prisma.submission.create({
-      data: { roundId: round.id, playerId: player.id, card },
-    }),
-    prisma.player.update({ where: { id: player.id }, data: { hand } }),
-  ])
+    const sound = await prisma.soundCard.findUnique({
+      where: { id: soundCardId },
+    })
+    if (!sound) throw new GameError('Som não encontrado', 404)
+
+    // O nome vai junto para o historico sobreviver caso o som saia do acervo.
+    // A mao de som nao e consumida — ver dealSoundHands.
+    await prisma.submission.create({
+      data: {
+        roundId: round.id,
+        playerId: player.id,
+        card: sound.name,
+        soundCardId,
+      },
+    })
+  } else {
+    const { card } = input
+    if (!card) throw new GameError('Escolha uma carta', 400)
+    if (!player.hand.includes(card))
+      throw new GameError('Essa carta não está na sua mão', 400)
+
+    // Tira a carta da mao apenas na primeira ocorrencia (pode haver duplicatas).
+    const hand = [...player.hand]
+    hand.splice(hand.indexOf(card), 1)
+
+    await prisma.$transaction([
+      prisma.submission.create({
+        data: { roundId: round.id, playerId: player.id, card },
+      }),
+      prisma.player.update({ where: { id: player.id }, data: { hand } }),
+    ])
+  }
 
   const submissionCount = await prisma.submission.count({
     where: { roundId: round.id },
@@ -306,6 +393,7 @@ export async function nextRound(code: string, playerId: string) {
         gameId: game.id,
         number: round.number + 1,
         prompt,
+        kind: roundKind(game.soundEvery, round.number + 1),
         phase: RoundPhase.SUBMITTING,
       },
     }),
