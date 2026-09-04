@@ -7,7 +7,7 @@ import {
 } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { GameError, fillPrompt } from '@/lib/game'
-import { soundUrl } from '@/lib/soundLibrary'
+import { getSoundLibrary } from '@/lib/soundLibrary'
 
 export type PlayerView = {
   id: string
@@ -111,31 +111,11 @@ export async function getGameState(
   const round = game.rounds[0] ?? null
 
   /*
-   * Uma consulta so para todos os sons que esta tela pode precisar: a mao do
-   * jogador e o que foi jogado na rodada. Buscar carta a carta multiplicaria
-   * ida ao banco a cada poll, que roda a cada 1,5s por jogador.
+   * A biblioteca vem de um cache em memoria, nao do banco a cada poll.
+   * Consultar aqui dobrava as consultas por requisicao e estourava o pool do
+   * pgbouncer com tres jogadores em partida — ver soundLibrary.ts.
    */
-  const soundIds = new Set<string>([
-    ...(me?.soundHand ?? []),
-    ...(round?.submissions.map((s) => s.soundCardId).filter(Boolean) ?? []),
-  ] as string[])
-
-  const sounds = soundIds.size
-    ? await prisma.soundCard.findMany({ where: { id: { in: [...soundIds] } } })
-    : []
-
-  const soundById = new Map(
-    sounds.map((s) => [
-      s.id,
-      {
-        id: s.id,
-        name: s.name,
-        url: soundUrl(s.path),
-        durationMs: s.durationMs,
-        gain: s.gain,
-      },
-    ])
-  )
+  const soundById = await getSoundLibrary()
 
   const players: PlayerView[] = game.players.map((p) => ({
     id: p.id,

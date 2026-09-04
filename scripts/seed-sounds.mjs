@@ -13,31 +13,76 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 /**
- * Duracao aproximada a partir do cabecalho do primeiro quadro MP3.
+ * Duracao do MP3, contando os quadros um a um.
  *
- * Aproximada de proposito: assume taxa constante, que e o caso de praticamente
- * todo clipe curto. Serve para a carta avisar "isto dura 17s" antes de alguem
- * tocar — nao precisa de precisao de milissegundo, precisa existir.
+ * A versao anterior estimava pelo primeiro quadro assumindo taxa constante, e
+ * errava feio nos arquivos VBR: um clipe de 2,1s aparecia como 5,8s porque o
+ * primeiro quadro vinha a 64kbps. Percorrer os quadros custa milissegundos num
+ * arquivo de algumas centenas de KB e acerta CBR e VBR igual.
  */
-function estimateMp3Ms(buffer) {
-  const V1L3 = [
-    0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0,
-  ]
-  const V2L3 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0]
-
-  for (let i = 0; i < Math.min(buffer.length - 4, 200_000); i++) {
-    if (buffer[i] !== 0xff || (buffer[i + 1] & 0xe0) !== 0xe0) continue
-
-    const mpeg1 = (buffer[i + 1] & 0x18) === 0x18
-    const layer3 = (buffer[i + 1] & 0x06) === 0x02
-    if (!layer3) continue
-
-    const kbps = (mpeg1 ? V1L3 : V2L3)[(buffer[i + 2] & 0xf0) >> 4]
-    if (!kbps) continue
-
-    return Math.round((buffer.length * 8) / kbps)
+function mp3DurationMs(buffer) {
+  const BITRATE = {
+    // [versao][indice] em kbps. versao 1 = MPEG1, 2 = MPEG2/2.5, Layer III.
+    1: [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0],
+    2: [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0],
   }
-  return 0
+  const SAMPLE_RATE = {
+    3: [44100, 48000, 32000, 0], // MPEG1
+    2: [22050, 24000, 16000, 0], // MPEG2
+    0: [11025, 12000, 8000, 0], // MPEG2.5
+  }
+
+  let i = 0
+  let samples = 0
+  let rate = 0
+
+  // Pula a tag ID3v2, que fica antes do audio e nao tem quadro nenhum.
+  if (buffer.length > 10 && buffer.toString('latin1', 0, 3) === 'ID3') {
+    const size =
+      (buffer[6] << 21) | (buffer[7] << 14) | (buffer[8] << 7) | buffer[9]
+    i = 10 + size
+  }
+
+  while (i + 4 <= buffer.length) {
+    if (buffer[i] !== 0xff || (buffer[i + 1] & 0xe0) !== 0xe0) {
+      i++
+      continue
+    }
+
+    const versionBits = (buffer[i + 1] & 0x18) >> 3
+    const layerBits = (buffer[i + 1] & 0x06) >> 1
+    const bitrateIdx = (buffer[i + 2] & 0xf0) >> 4
+    const rateIdx = (buffer[i + 2] & 0x0c) >> 2
+    const padding = (buffer[i + 2] & 0x02) >> 1
+
+    // Layer III apenas (layerBits === 1); indices reservados invalidam o quadro.
+    if (layerBits !== 1 || bitrateIdx === 0 || bitrateIdx === 15 || rateIdx === 3) {
+      i++
+      continue
+    }
+
+    const mpeg1 = versionBits === 3
+    const kbps = BITRATE[mpeg1 ? 1 : 2][bitrateIdx]
+    const sampleRate = (SAMPLE_RATE[versionBits] ?? SAMPLE_RATE[2])[rateIdx]
+    if (!kbps || !sampleRate) {
+      i++
+      continue
+    }
+
+    const perFrame = mpeg1 ? 1152 : 576
+    const length =
+      Math.floor(((mpeg1 ? 144 : 72) * kbps * 1000) / sampleRate) + padding
+    if (length <= 4) {
+      i++
+      continue
+    }
+
+    samples += perFrame
+    rate = sampleRate
+    i += length
+  }
+
+  return rate ? Math.round((samples / rate) * 1000) : 0
 }
 
 /** Nome legivel a partir do arquivo: "chora-nao-vagabunda.mp3" -> "Chora nao vagabunda". */
@@ -75,7 +120,7 @@ async function main() {
     try {
       const res = await fetch(url)
       if (res.ok) {
-        durationMs = estimateMp3Ms(Buffer.from(await res.arrayBuffer()))
+        durationMs = mp3DurationMs(Buffer.from(await res.arrayBuffer()))
       } else {
         console.warn(`[sons] ${path}: HTTP ${res.status} ao baixar`)
       }
