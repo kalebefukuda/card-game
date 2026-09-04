@@ -1,0 +1,12 @@
+import { handle, RouteContext } from '@/lib/apiHandler'
+import { leaveGame } from '@/lib/game'
+import { getGameState } from '@/lib/gameState'
+
+export async function POST(req: Request, { params }: RouteContext) {
+  const { code } = await params
+  const { playerId } = await req.json()
+  return handle(async () => {
+    await leaveGame(code, playerId)
+    return getGameState(code, playerId)
+  })
+}
