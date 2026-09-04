@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, Pause, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Mascot } from '@/components/brand/Mascot'
+import { Mark } from '@/components/brand/Mark'
 import {
   MAX_CARD_SECONDS,
   playSoundCard,
@@ -103,7 +103,7 @@ export function SoundCard({
           </p>
         </div>
 
-        <Mascot size={22} variant="full" />
+        <Mark size={22} />
       </div>
 
       {onAction && (

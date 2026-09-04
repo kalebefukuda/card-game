@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { Mascot } from '@/components/brand/Mascot'
+import { Mark } from '@/components/brand/Mark'
 import { playSound, type SoundName } from '@/lib/sound'
 
 type GameCardProps = {
@@ -51,7 +51,7 @@ export function GameCard({
         'rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)]',
         'transition-[transform,box-shadow] duration-[120ms] ease-out',
         isPrompt
-          ? 'bg-[var(--ink)] text-[var(--paper)] [--mascot-bg:var(--ink)]'
+          ? 'bg-[var(--ink)] text-[var(--paper)] [--mark-invert:1]'
           : 'bg-[var(--paper)] text-[var(--ink)]',
         interactive && 'shadow-hard-sm hover:-translate-y-1 hover:shadow-hard',
         interactive && 'active:translate-x-[3px] active:translate-y-[3px] active:shadow-none',
@@ -73,7 +73,7 @@ export function GameCard({
       </span>
 
       <span className="mt-2 flex items-center gap-1.5">
-        <Mascot size={26} variant="full" />
+        <Mark size={26} />
         <span className="text-[7px] font-bold tracking-[0.18em] uppercase">
           Meu Baralho
         </span>

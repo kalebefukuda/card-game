@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { ArrowRight, Loader2, WalletCards } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Mascot } from '@/components/brand/Mascot'
 import { Logo } from '@/components/brand/Logo'
+import { Mark } from '@/components/brand/Mark'
 import { SoundControl } from '@/components/sound/SoundControl'
 import {
   GameOptions,
@@ -93,11 +93,15 @@ export default function Home() {
 
       <main className="animate-rise mx-auto max-w-lg px-5 pt-10 pb-16">
         <div className="flex flex-col items-center">
-          <Mascot size={148} variant="full" title="Tico, o mascote" />
+          <Mark
+            size={200}
+            priority
+            alt="Meu Baralho"
+            className="w-full max-w-[420px] object-contain"
+          />
           {/*
-           * A tela nao tem titulo visivel de proposito: quem chega aqui ja sabe
-           * o que veio fazer. O h1 fica so para leitor de tela e para o
-           * documento nao ficar sem cabecalho.
+           * Sem titulo visivel: a marca ja e a identidade da tela. O h1 fica
+           * para leitor de tela e para o documento nao ficar sem cabecalho.
            */}
           <h1 className="sr-only">Meu Baralho</h1>
         </div>
