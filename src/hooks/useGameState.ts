@@ -24,12 +24,31 @@ export function useGameState(code: string, playerId: string | null) {
   // Evita que uma resposta lenta sobrescreva um estado mais novo.
   const latest = useRef(0)
 
+  /*
+   * Nunca deixa dois pedidos correrem juntos.
+   *
+   * Sem isto, quando a resposta demora mais que o intervalo, cada poll novo
+   * invalida o anterior pelo `ticket` e NENHUMA resposta e aceita — a tela fica
+   * presa no carregamento para sempre. Foi exatamente o que aconteceu contra o
+   * banco remoto: resposta de 2,6s com poll de 1,5s. Enfileirar tambem evita
+   * empilhar requisicoes em cima do pool de conexoes.
+   */
+  const inFlight = useRef(false)
+
   const refresh = useCallback(async () => {
+    if (inFlight.current) return
+    inFlight.current = true
+
     const ticket = ++latest.current
+    // Um pedido travado nao pode bloquear o polling para sempre.
+    const abort = new AbortController()
+    const timer = setTimeout(() => abort.abort(), 20_000)
+
     try {
       const query = playerId ? `?playerId=${encodeURIComponent(playerId)}` : ''
       const res = await fetch(`/api/game/${code}/state${query}`, {
         cache: 'no-store',
+        signal: abort.signal,
       })
       const data = await res.json()
       if (ticket !== latest.current) return
@@ -42,6 +61,8 @@ export function useGameState(code: string, playerId: string | null) {
     } catch {
       if (ticket === latest.current) setError('Sem conexão com o servidor')
     } finally {
+      clearTimeout(timer)
+      inFlight.current = false
       if (ticket === latest.current) setLoading(false)
     }
   }, [code, playerId])
