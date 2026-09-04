@@ -5,6 +5,7 @@ import { Loader2, Pause, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Mascot } from '@/components/brand/Mascot'
 import {
+  MAX_CARD_SECONDS,
   playSoundCard,
   preloadSoundCard,
   stopSoundCard,
@@ -63,7 +64,9 @@ export function SoundCard({
     window.setTimeout(() => setTocando(false), duracao * 1000)
   }
 
-  const segundos = sound.durationMs ? Math.round(sound.durationMs / 1000) : null
+  // Diz a verdade quando o clipe e maior que o teto: "20s · toca 15s".
+  const total = sound.durationMs ? Math.round(sound.durationMs / 1000) : null
+  const cortado = total !== null && total > MAX_CARD_SECONDS
 
   return (
     <div
@@ -94,7 +97,8 @@ export function SoundCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold">{sound.name}</p>
           <p className="text-xs font-semibold text-[var(--ink-soft)]">
-            {segundos ? `${segundos}s` : 'som'}
+            {total ? `${total}s` : 'som'}
+            {cortado && ` · toca ${MAX_CARD_SECONDS}s`}
             {tocando && ' · tocando'}
           </p>
         </div>
