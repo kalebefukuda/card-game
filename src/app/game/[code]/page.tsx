@@ -3,17 +3,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Check, Copy, Loader2, Trophy } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Loader2, Pause, Play, Trophy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { GameCard } from '@/components/game/GameCard'
+import { SoundCard } from '@/components/game/SoundCard'
 import { Scoreboard } from '@/components/game/Scoreboard'
 import { Mascot } from '@/components/brand/Mascot'
 import { Logo } from '@/components/brand/Logo'
-import { playSound } from '@/lib/sound'
+import { playSound, playSoundCard, stopSoundCard } from '@/lib/sound'
 import { SoundControl } from '@/components/sound/SoundControl'
 import { useGameState } from '@/hooks/useGameState'
-import type { RevealView } from '@/lib/gameState'
+import type { RevealView, SoundCardView } from '@/lib/gameState'
 import { loadPlayerId, savePlayerId, loadName, saveName } from '@/lib/session'
 import { MAX_NAME_LENGTH, MIN_PLAYERS } from '@/lib/constants'
 
@@ -185,6 +186,7 @@ export default function GamePage() {
               pending={pending}
               isHost={isHost}
               onSubmit={(card) => act('submit', { card })}
+              onSubmitSound={(soundCardId) => act('submit', { soundCardId })}
               onVote={(submissionId) => act('vote', { submissionId })}
               onNext={() => act('next-round')}
             />
@@ -394,6 +396,7 @@ function Round({
   pending,
   isHost,
   onSubmit,
+  onSubmitSound,
   onVote,
   onNext,
 }: {
@@ -401,6 +404,7 @@ function Round({
   pending: boolean
   isHost: boolean
   onSubmit: (card: string) => void
+  onSubmitSound: (soundCardId: string) => void
   onVote: (submissionId: string) => void
   onNext: () => void
 }) {
@@ -454,7 +458,21 @@ function Round({
         </div>
       </div>
 
-      {round.phase === 'SUBMITTING' && !youSubmitted && (
+      {round.phase === 'SUBMITTING' && !youSubmitted && round.kind === 'SOUND' && (
+        <SoundGrid>
+          {you.soundHand.map((s) => (
+            <SoundCard
+              key={s.id}
+              sound={s}
+              actionLabel="Jogar esta"
+              disabled={pending}
+              onAction={() => onSubmitSound(s.id)}
+            />
+          ))}
+        </SoundGrid>
+      )}
+
+      {round.phase === 'SUBMITTING' && !youSubmitted && round.kind === 'TEXT' && (
         <CardGrid>
           {you.hand.map((card, i) => (
             <GameCard
@@ -467,7 +485,25 @@ function Round({
         </CardGrid>
       )}
 
-      {round.phase === 'VOTING' && (
+      {round.phase === 'VOTING' && round.kind === 'SOUND' && (
+        <SoundGrid>
+          {round.submissions.map((s) =>
+            s.sound ? (
+              <SoundCard
+                key={s.id}
+                sound={s.sound}
+                actionLabel="Votar nesta"
+                badge={s.isMine ? 'sua' : undefined}
+                selected={round.yourVoteId === s.id}
+                disabled={s.isMine || !!round.yourVoteId || pending}
+                onAction={s.isMine ? undefined : () => onVote(s.id)}
+              />
+            ) : null
+          )}
+        </SoundGrid>
+      )}
+
+      {round.phase === 'VOTING' && round.kind === 'TEXT' && (
         <CardGrid>
           {round.submissions.map((s) => (
             <GameCard
@@ -498,7 +534,14 @@ function Round({
                   'border-[var(--ink)] bg-[var(--paper)]'
                 }
               >
-                <span className="flex-1 font-bold">{r.filled}</span>
+                {r.sound ? (
+                  <span className="flex flex-1 items-center gap-2.5">
+                    <PlaySound sound={r.sound} />
+                    <span className="font-bold">{r.sound.name}</span>
+                  </span>
+                ) : (
+                  <span className="flex-1 font-bold">{r.filled}</span>
+                )}
                 <span className="text-sm font-semibold text-[var(--ink-soft)]">
                   {r.playerName}
                   {r.isMine && ' (você)'}
@@ -589,9 +632,16 @@ function RoundWinner({ reveal }: { reveal: RevealView[] }) {
       <div className="mt-3 space-y-4">
         {winners.map((w) => (
           <div key={w.id}>
-            <p className="text-xl leading-snug font-bold text-balance">
-              {w.filled}
-            </p>
+            {w.sound ? (
+              <p className="flex items-center gap-3 text-xl leading-snug font-bold">
+                <PlaySound sound={w.sound} invertido />
+                {w.sound.name}
+              </p>
+            ) : (
+              <p className="text-xl leading-snug font-bold text-balance">
+                {w.filled}
+              </p>
+            )}
             <p className="mt-2 flex flex-wrap items-baseline gap-x-2 text-sm font-bold">
               <span className="text-base">
                 {w.playerName}
@@ -608,6 +658,53 @@ function RoundWinner({ reveal }: { reveal: RevealView[] }) {
         ))}
       </div>
     </div>
+  )
+}
+
+/**
+ * Botao de tocar usado na revelacao. Existe porque encaixar o nome do som na
+ * frase ("...pesquisa de Som 08") nao diz nada: numa rodada de som a piada e o
+ * audio, entao a revelacao precisa deixar ouvir de novo.
+ */
+function PlaySound({
+  sound,
+  invertido = false,
+}: {
+  sound: SoundCardView
+  invertido?: boolean
+}) {
+  const [tocando, setTocando] = useState(false)
+
+  return (
+    <button
+      type="button"
+      aria-label={`Ouvir ${sound.name}`}
+      onClick={async () => {
+        if (tocando) {
+          stopSoundCard()
+          return setTocando(false)
+        }
+        const dur = await playSoundCard(sound.url, sound.gain)
+        if (dur === null) return
+        setTocando(true)
+        window.setTimeout(() => setTocando(false), dur * 1000)
+      }}
+      className={
+        'grid size-10 shrink-0 place-items-center rounded-full border-[length:var(--border-w)] transition-transform duration-[120ms] active:scale-95 ' +
+        (invertido
+          ? 'border-[var(--paper)] bg-[var(--paper)] text-[var(--ink)]'
+          : 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]')
+      }
+    >
+      {tocando ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
+    </button>
+  )
+}
+
+/** Carta de som e larga e baixa, ao contrario da carta de texto em retrato. */
+function SoundGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
   )
 }
 

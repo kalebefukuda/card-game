@@ -329,3 +329,117 @@ export function playSound(name: SoundName) {
 
 /** Nomes disponiveis — usado pela verificacao automatizada. */
 export const SOUND_NAMES = Object.keys(RECIPES) as SoundName[]
+
+/* ------------------------------------------------------------------ */
+/* Cartas de som: audio arbitrario vindo do Storage                     */
+/* ------------------------------------------------------------------ */
+
+type Card = { buffer: AudioBuffer; normalize: number }
+
+const cards = new Map<string, Card>()
+const cardPending = new Map<string, Promise<Card | null>>()
+let playing: AudioBufferSourceNode | null = null
+
+/**
+ * Fator para trazer o audio a um nivel alvo, medido no proprio buffer.
+ *
+ * Os sons vem de fontes diferentes e variam muito de volume — um clipe chega
+ * quatro vezes mais alto que outro. Medir aqui, no cliente, evita ter que
+ * calibrar cada arquivo na mao ao subir: qualquer som novo ja entra nivelado.
+ */
+function normalizationFor(buffer: AudioBuffer) {
+  const ALVO = 0.12
+  const dados = buffer.getChannelData(0)
+
+  // Amostra em saltos: percorrer 800 mil amostras trava a interface, e para
+  // estimar nivel medio um a cada 64 da praticamente o mesmo numero.
+  let soma = 0
+  let n = 0
+  for (let i = 0; i < dados.length; i += 64) {
+    soma += dados[i] * dados[i]
+    n++
+  }
+
+  const rms = Math.sqrt(soma / Math.max(1, n))
+  if (!rms) return 1
+  return Math.min(3, ALVO / rms)
+}
+
+async function loadCard(url: string): Promise<Card | null> {
+  if (cards.has(url)) return cards.get(url) as Card
+  const existing = cardPending.get(url)
+  if (existing) return existing
+
+  const task = (async () => {
+    const audio = ensureContext()
+    if (!audio) return null
+    try {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const buffer = await audio.decodeAudioData(await res.arrayBuffer())
+      const card = { buffer, normalize: normalizationFor(buffer) }
+      cards.set(url, card)
+      return card
+    } catch {
+      return null
+    } finally {
+      cardPending.delete(url)
+    }
+  })()
+
+  cardPending.set(url, task)
+  return task
+}
+
+/** Baixa e decodifica antes de alguem tocar, para o play sair instantaneo. */
+export function preloadSoundCard(url: string) {
+  if (!url) return
+  void loadCard(url)
+}
+
+export function stopSoundCard() {
+  if (!playing) return
+  try {
+    playing.stop()
+  } catch {
+    // Ja parou sozinho; nada a fazer.
+  }
+  playing = null
+}
+
+/**
+ * Toca uma carta de som. Devolve a duracao real, ou null se falhou.
+ *
+ * Toca uma de cada vez de proposito: na votacao a pessoa fica pulando entre
+ * cartas, e sons sobrepostos viram ruido em que nao da para julgar nenhum.
+ */
+export async function playSoundCard(
+  url: string,
+  gain = 1
+): Promise<number | null> {
+  if (typeof window === 'undefined' || !url) return null
+  initSound()
+  if (state.muted || state.volume === 0) return null
+
+  const audio = unlockSound()
+  if (!audio || !master) return null
+
+  const card = await loadCard(url)
+  if (!card || audio.state !== 'running' || !master) return null
+
+  stopSoundCard()
+
+  const source = audio.createBufferSource()
+  const out = audio.createGain()
+  source.buffer = card.buffer
+  out.gain.value = card.normalize * gain
+  source.connect(out)
+  out.connect(master)
+  source.onended = () => {
+    if (playing === source) playing = null
+  }
+  source.start()
+  playing = source
+
+  return card.buffer.duration
+}

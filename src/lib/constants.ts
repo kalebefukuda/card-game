@@ -16,3 +16,10 @@ export const SCORE_RANGE = { min: 3, max: 15 } as const
 export const ROUNDS_RANGE = { min: 3, max: 20 } as const
 export const HAND_RANGE = { min: 5, max: 12 } as const
 export const DEFAULT_ROUND_LIMIT = 8
+
+/**
+ * Cartas de som na mao. Pequeno de proposito: a biblioteca tem poucas dezenas
+ * de sons, e mao grande faria dois jogadores caírem com o mesmo som na mesa.
+ */
+export const SOUND_HAND_SIZE = 3
+export const SOUND_EVERY_RANGE = { min: 2, max: 10 } as const

@@ -1,6 +1,13 @@
-import { DeckMode, EndCondition, GameStatus, RoundPhase } from '@prisma/client'
+import {
+  DeckMode,
+  EndCondition,
+  GameStatus,
+  RoundKind,
+  RoundPhase,
+} from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { GameError, fillPrompt } from '@/lib/game'
+import { soundUrl } from '@/lib/soundLibrary'
 
 export type PlayerView = {
   id: string
@@ -11,7 +18,22 @@ export type PlayerView = {
   hasVoted: boolean
 }
 
-export type SubmissionView = { id: string; card: string; isMine: boolean }
+/** Carta de som pronta para tocar: a interface nunca monta URL sozinha. */
+export type SoundCardView = {
+  id: string
+  name: string
+  url: string
+  durationMs: number
+  gain: number
+}
+
+export type SubmissionView = {
+  id: string
+  card: string
+  isMine: boolean
+  /** Presente apenas em rodada de som. */
+  sound: SoundCardView | null
+}
 
 export type RevealView = {
   id: string
@@ -21,6 +43,8 @@ export type RevealView = {
   votes: number
   isWinner: boolean
   isMine: boolean
+  /** Presente apenas em rodada de som. */
+  sound: SoundCardView | null
 }
 
 export type GameState = {
@@ -31,6 +55,7 @@ export type GameState = {
   roundLimit: number
   deckMode: DeckMode
   handSize: number
+  soundEvery: number
   players: PlayerView[]
   you: {
     id: string
@@ -38,10 +63,13 @@ export type GameState = {
     isHost: boolean
     score: number
     hand: string[]
+    /** Mao de som. Vazia fora de partida com rodada de som ligada. */
+    soundHand: SoundCardView[]
   } | null
   round: {
     number: number
     prompt: string
+    kind: RoundKind
     phase: RoundPhase
     submittedCount: number
     votedCount: number
@@ -82,6 +110,33 @@ export async function getGameState(
   const me = game.players.find((p) => p.id === playerId) ?? null
   const round = game.rounds[0] ?? null
 
+  /*
+   * Uma consulta so para todos os sons que esta tela pode precisar: a mao do
+   * jogador e o que foi jogado na rodada. Buscar carta a carta multiplicaria
+   * ida ao banco a cada poll, que roda a cada 1,5s por jogador.
+   */
+  const soundIds = new Set<string>([
+    ...(me?.soundHand ?? []),
+    ...(round?.submissions.map((s) => s.soundCardId).filter(Boolean) ?? []),
+  ] as string[])
+
+  const sounds = soundIds.size
+    ? await prisma.soundCard.findMany({ where: { id: { in: [...soundIds] } } })
+    : []
+
+  const soundById = new Map(
+    sounds.map((s) => [
+      s.id,
+      {
+        id: s.id,
+        name: s.name,
+        url: soundUrl(s.path),
+        durationMs: s.durationMs,
+        gain: s.gain,
+      },
+    ])
+  )
+
   const players: PlayerView[] = game.players.map((p) => ({
     id: p.id,
     name: p.name,
@@ -100,6 +155,7 @@ export async function getGameState(
     roundView = {
       number: round.number,
       prompt: round.prompt,
+      kind: round.kind,
       phase: round.phase,
       submittedCount: round.submissions.length,
       votedCount: round.votes.length,
@@ -111,6 +167,9 @@ export async function getGameState(
               id: s.id,
               card: s.card,
               isMine: s.playerId === me?.id,
+              sound: s.soundCardId
+                ? (soundById.get(s.soundCardId) ?? null)
+                : null,
             }))
         : [],
       reveal: isReveal
@@ -124,6 +183,9 @@ export async function getGameState(
               votes: s.votes.length,
               isWinner: best > 0 && s.votes.length === best,
               isMine: s.playerId === me?.id,
+              sound: s.soundCardId
+                ? (soundById.get(s.soundCardId) ?? null)
+                : null,
             }))
         : [],
       yourVoteId:
@@ -141,6 +203,7 @@ export async function getGameState(
     roundLimit: game.roundLimit,
     deckMode: game.deckMode,
     handSize: game.handSize,
+    soundEvery: game.soundEvery,
     players,
     you: me
       ? {
@@ -149,6 +212,9 @@ export async function getGameState(
           isHost: me.isHost,
           score: me.score,
           hand: me.hand,
+          soundHand: me.soundHand
+            .map((id) => soundById.get(id))
+            .filter((s) => s !== undefined),
         }
       : null,
     round: roundView,
