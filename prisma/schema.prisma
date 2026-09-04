@@ -26,6 +26,8 @@ model Game {
   deckMode     DeckMode     @default(REFILL)
   /// Cartas na mao. Em DEPLETE, define quantas rodadas a partida aguenta.
   handSize     Int          @default(7)
+  /// A cada quantas rodadas entra uma rodada de som. 0 desliga.
+  soundEvery   Int          @default(0)
   /// Cartas-pergunta ainda nao usadas, embaralhadas no inicio da partida.
   promptDeck   String[]
   /// Cartas-resposta ainda nao distribuidas.
@@ -42,6 +44,8 @@ model Player {
   score       Int          @default(0)
   /// Mao do jogador: cartas-resposta que ele pode jogar.
   hand        String[]
+  /// Ids de SoundCard na mao de som. Distribuida no inicio da partida.
+  soundHand   String[]
   joinedAt    DateTime     @default(now())
   game        Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
   submissions Submission[]
@@ -55,6 +59,8 @@ model Round {
   gameId      String
   number      Int
   prompt      String
+  /// Rodada de texto ou de som. Define de que baralho a mao e jogada.
+  kind        RoundKind    @default(TEXT)
   phase       RoundPhase   @default(SUBMITTING)
   winnerId    String?
   createdAt   DateTime     @default(now())
@@ -66,13 +72,18 @@ model Round {
 }
 
 model Submission {
-  id       String @id @default(uuid())
-  roundId  String
-  playerId String
-  card     String
-  round    Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  votes    Vote[]
+  id          String     @id @default(uuid())
+  roundId     String
+  playerId    String
+  /// Texto da carta jogada. Em rodada de som guarda o nome, para o historico
+  /// sobreviver a exclusao do arquivo.
+  card        String
+  /// Preenchido apenas em rodada de som.
+  soundCardId String?
+  round       Round      @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  player      Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  sound       SoundCard? @relation(fields: [soundCardId], references: [id], onDelete: SetNull)
+  votes       Vote[]
 
   /// Um jogador joga no maximo uma carta por rodada.
   @@unique([roundId, playerId])
@@ -89,6 +100,29 @@ model Vote {
 
   /// Um voto por jogador por rodada.
   @@unique([roundId, voterId])
+}
+
+/// Biblioteca de sons. O arquivo vive no bucket "sounds" do Supabase Storage;
+/// aqui fica so o caminho e o que a interface precisa saber antes de tocar.
+model SoundCard {
+  id          String       @id @default(uuid())
+  /// Caminho do objeto dentro do bucket.
+  path        String       @unique
+  /// Nome mostrado na carta.
+  name        String
+  /// Duracao, para a carta dizer quanto dura antes de alguem tocar.
+  durationMs  Int          @default(0)
+  /// Ganho de reproducao. Os arquivos variam muito de volume entre si.
+  gain        Float        @default(1)
+  /// Permite tirar um som de circulacao sem apagar o historico.
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  submissions Submission[]
+}
+
+enum RoundKind {
+  TEXT
+  SOUND
 }
 
 enum EndCondition {
