@@ -145,6 +145,9 @@ enum GameStatus {
   LOBBY
   IN_PROGRESS
   FINISHED
+  /// O host saiu antes do fim. Diferente de FINISHED porque nao ha campeao:
+  /// a partida nao chegou ao fim, foi interrompida.
+  ABANDONED
 }
 
 enum RoundPhase {

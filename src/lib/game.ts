@@ -402,3 +402,30 @@ export async function nextRound(code: string, playerId: string) {
     }),
   ])
 }
+
+/**
+ * Jogador sai da partida.
+ *
+ * Sair do host encerra para todos: sem ele ninguem puxa a proxima rodada, e
+ * hoje os outros ficavam presos numa sala morta esperando algo que nunca vem.
+ * A partida vira ABANDONED e nao FINISHED porque nao houve campeao — ela foi
+ * interrompida, e o placar final nao significa vitoria de ninguem.
+ *
+ * Jogador comum sair nao encerra nada: ele volta pelo mesmo link e a
+ * reconexao ja existente o devolve ao lugar.
+ */
+export async function leaveGame(code: string, playerId: string) {
+  const game = await loadGame(code)
+  const player = requirePlayer(game.players, playerId)
+
+  if (!player.isHost) return { ended: false }
+  if (game.status === GameStatus.FINISHED || game.status === GameStatus.ABANDONED)
+    return { ended: false }
+
+  await prisma.game.update({
+    where: { id: game.id },
+    data: { status: GameStatus.ABANDONED },
+  })
+
+  return { ended: true }
+}

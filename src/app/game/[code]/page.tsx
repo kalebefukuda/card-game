@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { GameCard } from '@/components/game/GameCard'
 import { SoundCard } from '@/components/game/SoundCard'
 import { Scoreboard } from '@/components/game/Scoreboard'
-import { Mascot } from '@/components/brand/Mascot'
+import { Mark } from '@/components/brand/Mark'
 import { Logo } from '@/components/brand/Logo'
 import { playSound, playSoundCard, stopSoundCard } from '@/lib/sound'
 import { SoundControl } from '@/components/sound/SoundControl'
@@ -42,6 +42,7 @@ export default function GamePage() {
    * que impede o som de repetir a cada resposta. A primeira carga nunca toca:
    * entrar numa sala nao e um evento.
    */
+  const [confirmandoSaida, setConfirmandoSaida] = useState(false)
   const cue = useRef<string | null>(null)
   const knownPlayers = useRef<number | null>(null)
 
@@ -80,7 +81,7 @@ export default function GamePage() {
   if (!ready || (loading && !state)) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-3">
-        <Mascot size={72} />
+        <Mark size={72} />
         <Loader2 className="animate-spin text-[var(--ink-soft)]" />
       </main>
     )
@@ -90,7 +91,7 @@ export default function GamePage() {
   if (!state && error) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
-        <Mascot size={96} variant="full" />
+        <Mark size={96} />
         <div>
           <h1 className="text-2xl font-bold">{error}</h1>
           <p className="mt-2 font-semibold text-[var(--ink-soft)]">
@@ -132,6 +133,13 @@ export default function GamePage() {
    * inicial e o limite real, mesmo com a condicao de fim por pontos — por isso
    * ela entra aqui e nao so o roundLimit.
    */
+  /*
+   * So o host encerra, e so enquanto a partida esta viva. Depois de acabar,
+   * sair e so navegar — nao ha nada para interromper.
+   */
+  const podeEncerrar =
+    isHost && (state.status === 'LOBBY' || state.status === 'IN_PROGRESS')
+
   const roundsTotal =
     state.deckMode === 'DEPLETE'
       ? state.handSize
@@ -143,9 +151,22 @@ export default function GamePage() {
     <div className="min-h-dvh">
       <header className="sticky top-0 z-10 border-b-[length:var(--border-w)] border-[var(--ink)] bg-[var(--paper)]/95 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-          <Link href="/" aria-label="Voltar ao início">
-            <Logo size={30} compact />
-          </Link>
+          {podeEncerrar ? (
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click')
+                setConfirmandoSaida(true)
+              }}
+              aria-label="Sair da partida"
+            >
+              <Logo size={30} compact />
+            </button>
+          ) : (
+            <Link href="/" aria-label="Voltar ao início">
+              <Logo size={30} compact />
+            </Link>
+          )}
 
           <div className="flex items-center gap-3">
             {round && state.status === 'IN_PROGRESS' && (
@@ -195,12 +216,110 @@ export default function GamePage() {
           {state.status === 'FINISHED' && (
             <Finished state={state} onHome={() => router.push('/')} />
           )}
+
+          {state.status === 'ABANDONED' && (
+            <Abandoned onHome={() => router.push('/')} />
+          )}
         </section>
 
         <div className="md:order-last">
           <Scoreboard state={state} youId={you.id} />
         </div>
       </main>
+
+      {confirmandoSaida && (
+        <LeaveDialog
+          emAndamento={state.status === 'IN_PROGRESS'}
+          pending={pending}
+          onCancel={() => setConfirmandoSaida(false)}
+          onConfirm={async () => {
+            await act('leave')
+            router.push('/')
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Confirmacao de saida do host.
+ *
+ * Existe porque sair do host encerra a partida de todo mundo, e antes disso
+ * acontecia sem aviso: o host clicava no logo por reflexo e os outros ficavam
+ * numa sala sem quem puxasse a proxima rodada.
+ */
+function LeaveDialog({
+  emAndamento,
+  pending,
+  onCancel,
+  onConfirm,
+}: {
+  emAndamento: boolean
+  pending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  // Esc fecha: dialogo sem saida pelo teclado prende quem nao usa mouse.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-5"
+      onClick={onCancel}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-sair"
+        onClick={(e) => e.stopPropagation()}
+        className="animate-rise w-full max-w-sm rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--paper)] p-6 shadow-hard"
+      >
+        <h2 id="titulo-sair" className="text-xl font-bold">
+          Encerrar a partida?
+        </h2>
+        <p className="mt-2 font-semibold text-[var(--ink-soft)]">
+          {emAndamento
+            ? 'Você é o host. Se sair agora, a partida acaba para todos e ninguém vence.'
+            : 'Você é o host. Se sair agora, a sala fecha para todos.'}
+        </p>
+
+        <div className="mt-6 flex gap-3">
+          <Button
+            variant="secondary"
+            onClick={onCancel}
+            className="flex-1"
+            autoFocus
+          >
+            Continuar jogando
+          </Button>
+          <Button onClick={onConfirm} disabled={pending} className="flex-1">
+            {pending ? <Loader2 className="animate-spin" /> : 'Encerrar'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Tela de quem ficou quando o host abandonou a partida. */
+function Abandoned({ onHome }: { onHome: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-5 text-center">
+      <Mark size={104} />
+      <div>
+        <h1 className="text-3xl font-extrabold">O host saiu</h1>
+        <p className="mt-2 font-semibold text-[var(--ink-soft)]">
+          A partida foi encerrada. Ninguém venceu esta — comecem outra.
+        </p>
+      </div>
+      <Button size="lg" onClick={onHome} className="w-full max-w-xs">
+        Voltar ao início
+      </Button>
     </div>
   )
 }
@@ -275,7 +394,7 @@ function JoinPrompt({
 
   return (
     <main className="animate-rise mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-5 px-6 text-center">
-      <Mascot size={96} variant="full" mood="happy" />
+      <Mark size={96} />
       <div>
         <h1 className="text-2xl font-bold">Entrar na partida</h1>
         <p className="roomcode mt-1 text-lg text-[var(--ink-soft)]">{code}</p>
@@ -381,7 +500,7 @@ function Lobby({
         </div>
       ) : (
         <div className="flex items-center gap-3 rounded-[var(--radius)] border-2 border-dashed border-[var(--line-soft)] px-5 py-5 text-left">
-          <Mascot size={40} />
+          <Mark size={40} />
           <p className="font-semibold text-[var(--ink-soft)]">
             Esperando o host começar a partida…
           </p>
@@ -580,7 +699,7 @@ function Finished({
 
   return (
     <div className="flex flex-col items-center gap-5 text-center">
-      <Mascot size={112} variant="full" mood="happy" />
+      <Mark size={112} />
       <div>
         <h1 className="text-3xl font-bold">
           {tie ? 'Empate!' : 'Temos um campeão!'}
@@ -623,7 +742,7 @@ function RoundWinner({ reveal }: { reveal: RevealView[] }) {
   const empate = winners.length > 1
 
   return (
-    <div className="animate-rise rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--ink)] p-5 text-[var(--paper)] shadow-hard [--mascot-bg:var(--ink)]">
+    <div className="animate-rise rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--ink)] p-5 text-[var(--paper)] shadow-hard [--mark-invert:1]">
       <p className="kicker flex items-center gap-2 opacity-70">
         <Trophy size={14} />
         {empate ? 'Empate na rodada' : 'Vencedora da rodada'}

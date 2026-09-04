@@ -1,8 +1,8 @@
-import { Mascot } from './Mascot'
+import { Mark } from './Mark'
 
-/** Assinatura da marca: mascote + nome. `compact` esconde o nome no mobile. */
+/** Assinatura da marca: ilustracao + nome. `compact` esconde o nome no mobile. */
 export function Logo({
-  size = 36,
+  size = 34,
   compact = false,
 }: {
   size?: number
@@ -10,7 +10,8 @@ export function Logo({
 }) {
   return (
     <span className="flex items-center gap-2">
-      <Mascot size={size} variant="full" />
+      {/* priority: o logo fica acima da dobra e o lazy fazia ele piscar em branco */}
+      <Mark size={size} priority />
       <span
         className={
           'text-lg leading-none font-extrabold tracking-[-0.02em] text-[var(--ink)]' +

@@ -336,6 +336,20 @@ export const SOUND_NAMES = Object.keys(RECIPES) as SoundName[]
 
 type Card = { buffer: AudioBuffer; normalize: number }
 
+/**
+ * Teto de reproducao da carta de som.
+ *
+ * Numa rodada de som cada jogador ouve as tres cartas da mesa antes de votar.
+ * Com um clipe de 20s isso vira quase dois minutos so de escuta, e a rodada
+ * arrasta. Cortar aqui, e nao no arquivo, mantem o original intacto e vale
+ * automaticamente para qualquer som novo.
+ *
+ * Se a piada estiver depois dos 15s, nao ha jeito automatico: aquele arquivo
+ * especifico precisa ser cortado escolhendo QUAIS 15s ficam.
+ */
+export const MAX_CARD_SECONDS = 15
+const FADE_SECONDS = 0.5
+
 const cards = new Map<string, Card>()
 const cardPending = new Map<string, Promise<Card | null>>()
 let playing: AudioBufferSourceNode | null = null
@@ -432,14 +446,26 @@ export async function playSoundCard(
   const source = audio.createBufferSource()
   const out = audio.createGain()
   source.buffer = card.buffer
-  out.gain.value = card.normalize * gain
   source.connect(out)
   out.connect(master)
+
+  const nivel = card.normalize * gain
+  const duracao = Math.min(card.buffer.duration, MAX_CARD_SECONDS)
+  const agora = audio.currentTime
+
+  out.gain.setValueAtTime(nivel, agora)
+
+  // Som cortado no meio soa como falha; o fade avisa que acabou de proposito.
+  if (card.buffer.duration > MAX_CARD_SECONDS) {
+    out.gain.setValueAtTime(nivel, agora + duracao - FADE_SECONDS)
+    out.gain.linearRampToValueAtTime(0.0001, agora + duracao)
+  }
+
   source.onended = () => {
     if (playing === source) playing = null
   }
-  source.start()
+  source.start(agora, 0, duracao)
   playing = source
 
-  return card.buffer.duration
+  return duracao
 }

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Mascot } from '@/components/brand/Mascot'
+import { Mark } from '@/components/brand/Mark'
 import { playSound } from '@/lib/sound'
 import { SoundControl } from '@/components/sound/SoundControl'
 import { answerCards } from '@/data/answerCards'
@@ -95,7 +95,7 @@ export default function VerCartas() {
                 className={
                   'h-11 flex-1 rounded-[var(--radius)] border-2 text-sm font-bold transition-colors ' +
                   (ativa
-                    ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] [--mascot-bg:var(--ink)]'
+                    ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
                     : 'border-[var(--ink)] bg-[var(--paper)] text-[var(--ink-soft)] hover:bg-black/5')
                 }
               >
@@ -112,7 +112,7 @@ export default function VerCartas() {
 
         {filtradas.length === 0 ? (
           <div className="mt-10 flex flex-col items-center gap-4 text-center">
-            <Mascot size={96} variant="full" />
+            <Mark size={96} />
             <div>
               <p className="text-lg font-bold">
                 Nenhuma carta com “{busca}”
@@ -135,7 +135,7 @@ export default function VerCartas() {
                   className={
                     'flex aspect-[3/4] flex-col justify-between rounded-[var(--radius)] border-2 border-b-[5px] p-4 ' +
                     (pergunta
-                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] [--mascot-bg:var(--ink)]'
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] [--mark-invert:1]'
                       : 'border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)]')
                   }
                 >
@@ -150,7 +150,7 @@ export default function VerCartas() {
                     {carta.texto}
                   </span>
                   <span className="mt-2 flex items-center gap-1.5 opacity-70">
-                    <Mascot size={26} variant="full" />
+                    <Mark size={26} />
                     <span className="text-[7px] font-bold tracking-[0.16em] uppercase">
                       Meu Baralho
                     </span>
