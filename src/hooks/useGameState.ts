@@ -5,7 +5,7 @@ import type { GameState } from '@/lib/gameState'
 
 const POLL_INTERVAL = 1500
 
-type Action = 'start' | 'submit' | 'vote' | 'next-round'
+type Action = 'start' | 'submit' | 'vote' | 'next-round' | 'leave'
 
 /**
  * Fonte unica do estado da partida.
