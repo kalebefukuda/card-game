@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma'
 import { answerCards } from '@/data/answerCards'
 import { promptCards } from '@/data/promptCards'
 import { MIN_PLAYERS, SOUND_HAND_SIZE } from '@/lib/constants'
+import { getSoundLibrary } from '@/lib/soundLibrary'
 
 export {
   HAND_SIZE,
@@ -95,10 +96,12 @@ function roundKind(soundEvery: number, number: number): RoundKind {
 async function dealSoundHands(soundEvery: number, playerCount: number) {
   if (soundEvery <= 0) return []
 
-  const library = await prisma.soundCard.findMany({
-    where: { active: true },
-    select: { id: true },
-  })
+  /*
+   * Mesma fonte que o gameState usa para montar a tela. Consultar o banco aqui
+   * e o cache la deixava os dois discordarem: uma carta recem-semeada podia ser
+   * distribuida e depois sumir da mao, porque o cache ainda nao a conhecia.
+   */
+  const library = [...(await getSoundLibrary()).values()]
 
   if (library.length < playerCount) {
     throw new GameError(
