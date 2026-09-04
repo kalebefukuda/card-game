@@ -7,6 +7,7 @@ import {
   HAND_RANGE,
   ROUNDS_RANGE,
   SCORE_RANGE,
+  SOUND_EVERY_RANGE,
   DEFAULT_TARGET_SCORE,
   DEFAULT_ROUND_LIMIT,
   HAND_SIZE,
@@ -21,6 +22,8 @@ export type GameOptionsValue = {
   roundLimit: number
   deckMode: DeckModeValue
   handSize: number
+  /** A cada quantas rodadas entra uma de som. 0 desliga. */
+  soundEvery: number
 }
 
 export const DEFAULT_OPTIONS: GameOptionsValue = {
@@ -29,6 +32,7 @@ export const DEFAULT_OPTIONS: GameOptionsValue = {
   roundLimit: DEFAULT_ROUND_LIMIT,
   deckMode: 'REFILL',
   handSize: HAND_SIZE,
+  soundEvery: 0,
 }
 
 const DECK_LABELS: Record<DeckModeValue, { titulo: string; ajuda: string }> = {
@@ -90,6 +94,7 @@ export function GameOptions({
         ? `${value.targetScore} pts`
         : `${value.roundLimit} rodadas`,
     DECK_LABELS[value.deckMode].titulo.toLowerCase(),
+    ...(value.soundEvery > 0 ? [`som a cada ${value.soundEvery}`] : []),
   ].join(' · ')
 
   return (
@@ -183,6 +188,45 @@ export function GameOptions({
               max={HAND_RANGE.max}
               onChange={(n) => set('handSize', n)}
             />
+          </Campo>
+
+          <Campo rotulo="Rodada de som">
+            <button
+              type="button"
+              aria-pressed={value.soundEvery > 0}
+              onClick={() => {
+                playSound('click')
+                set('soundEvery', value.soundEvery > 0 ? 0 : 3)
+              }}
+              className={cn(
+                'w-full rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] p-3 text-left transition-colors',
+                value.soundEvery > 0
+                  ? 'bg-[var(--ink)] text-[var(--paper)]'
+                  : 'bg-[var(--paper)] hover:bg-black/5'
+              )}
+            >
+              <span className="block text-sm font-bold">
+                {value.soundEvery > 0 ? 'Ligada' : 'Desligada'}
+              </span>
+              <span
+                className={cn(
+                  'block text-xs font-semibold',
+                  value.soundEvery > 0 ? 'opacity-75' : 'text-[var(--ink-soft)]'
+                )}
+              >
+                A mão vira cartas de som e a mesa vota no melhor áudio.
+              </span>
+            </button>
+
+            {value.soundEvery > 0 && (
+              <Contador
+                rotulo="A cada quantas rodadas"
+                valor={value.soundEvery}
+                min={SOUND_EVERY_RANGE.min}
+                max={SOUND_EVERY_RANGE.max}
+                onChange={(n) => set('soundEvery', n)}
+              />
+            )}
           </Campo>
 
           {conflito && (
