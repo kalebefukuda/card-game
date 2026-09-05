@@ -1,10 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
-import { Loader2, Minus, Plus } from 'lucide-react'
+import { Minus, Plus, Volume2, VolumeX } from 'lucide-react'
 import { playSound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 import {
   HAND_RANGE,
   ROUNDS_RANGE,
@@ -76,176 +74,120 @@ export function optionsConflict(v: GameOptionsValue): string | null {
 }
 
 /**
- * Ajustes da partida, em dialogo.
+ * Ajustes da partida.
  *
- * Antes eram uma secao recolhida na tela inicial, e ficavam invisiveis: quem
- * criava a partida nem sabia que dava para escolher rodada de som ou prazo.
- * Agora "Criar partida" abre isto, e a sala e criada daqui — as opcoes deixam
- * de ser um detalhe escondido e passam a ser o passo da criacao.
+ * Ja foi secao recolhida na tela inicial — invisivel, quem criava nem sabia que
+ * dava para escolher rodada de som ou prazo — e depois dialogo, apertado: as
+ * opcoes nao cabiam de uma vez numa caixa e cada uma precisa de uma linha
+ * explicando o que faz. Agora e o corpo da tela /new-game, com espaco para
+ * isso, e a navegacao normal do app serve de saida.
  */
-export function GameOptionsDialog({
+export function GameOptionsForm({
   value,
   onChange,
-  onConfirm,
-  onCancel,
-  pending = false,
-  error,
 }: {
   value: GameOptionsValue
   onChange: (v: GameOptionsValue) => void
-  onConfirm: () => void
-  onCancel: () => void
-  pending?: boolean
-  error?: string | null
 }) {
   const set = <K extends keyof GameOptionsValue>(
     key: K,
     v: GameOptionsValue[K]
   ) => onChange({ ...value, [key]: v })
 
-  // Esc fecha: dialogo sem saida pelo teclado prende quem nao usa mouse.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel])
-
-  const conflito = optionsConflict(value)
   const porPontos = value.endCondition === 'TARGET_SCORE'
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 sm:p-5"
-      onClick={onCancel}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="titulo-opcoes"
-        onClick={(e) => e.stopPropagation()}
-        className="animate-rise flex max-h-[90dvh] w-full max-w-md flex-col rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--paper)] shadow-hard"
-      >
-        <div className="border-b-[length:var(--border-w)] border-[var(--ink)] px-6 py-5">
-          <h2 id="titulo-opcoes" className="text-xl font-bold">
-            Como vão jogar?
-          </h2>
-        </div>
+    <div className="space-y-8">
+      <Campo rotulo="Como a partida acaba">
+        <Segmentado
+          opcoes={[
+            { valor: 'TARGET_SCORE', rotulo: 'Por pontos' },
+            { valor: 'ROUND_LIMIT', rotulo: 'Por rodadas' },
+          ]}
+          valor={value.endCondition}
+          onChange={(v) => set('endCondition', v as EndConditionValue)}
+        />
+        {porPontos ? (
+          <Contador
+            rotulo="Pontos para vencer"
+            valor={value.targetScore}
+            min={SCORE_RANGE.min}
+            max={SCORE_RANGE.max}
+            onChange={(n) => set('targetScore', n)}
+          />
+        ) : (
+          <Contador
+            rotulo="Rodadas"
+            valor={value.roundLimit}
+            min={ROUNDS_RANGE.min}
+            max={ROUNDS_RANGE.max}
+            onChange={(n) => set('roundLimit', n)}
+          />
+        )}
+      </Campo>
 
-        {/* Rola por dentro: em telas pequenas as opcoes nao caberiam de uma vez. */}
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
-          <Campo rotulo="Como a partida acaba">
-            <Segmentado
-              opcoes={[
-                { valor: 'TARGET_SCORE', rotulo: 'Por pontos' },
-                { valor: 'ROUND_LIMIT', rotulo: 'Por rodadas' },
-              ]}
-              valor={value.endCondition}
-              onChange={(v) => set('endCondition', v as EndConditionValue)}
-            />
-            {porPontos ? (
-              <Contador
-                rotulo="Pontos para vencer"
-                valor={value.targetScore}
-                min={SCORE_RANGE.min}
-                max={SCORE_RANGE.max}
-                onChange={(n) => set('targetScore', n)}
-              />
-            ) : (
-              <Contador
-                rotulo="Rodadas"
-                valor={value.roundLimit}
-                min={ROUNDS_RANGE.min}
-                max={ROUNDS_RANGE.max}
-                onChange={(n) => set('roundLimit', n)}
-              />
-            )}
-          </Campo>
-
-          <Campo rotulo="Baralho">
-            <div className="space-y-2">
-              {(Object.keys(DECK_LABELS) as DeckModeValue[]).map((modo) => (
-                <Opcao
-                  key={modo}
-                  ativo={value.deckMode === modo}
-                  titulo={DECK_LABELS[modo].titulo}
-                  ajuda={DECK_LABELS[modo].ajuda}
-                  onClick={() => set('deckMode', modo)}
-                />
-              ))}
-            </div>
-
-            <Contador
-              rotulo="Cartas na mão"
-              valor={value.handSize}
-              min={HAND_RANGE.min}
-              max={HAND_RANGE.max}
-              onChange={(n) => set('handSize', n)}
-            />
-          </Campo>
-
-          <Campo rotulo="Prazo da rodada">
-            <Segmentado
-              opcoes={[
-                ...TURN_PRESETS.map((s) => ({
-                  valor: String(s),
-                  rotulo: `${s}s`,
-                })),
-                { valor: '0', rotulo: 'Sem prazo' },
-              ]}
-              valor={String(value.turnSeconds)}
-              onChange={(v) => set('turnSeconds', Number(v))}
-            />
-            <p className="text-xs font-semibold text-[var(--ink-soft)]">
-              {value.turnSeconds > 0
-                ? `Vale para jogar e para votar. Quem não agir em ${value.turnSeconds}s entra com uma escolha sorteada, e a rodada segue.`
-                : 'A rodada espera por todos. Um jogador ausente trava a mesa.'}
-            </p>
-          </Campo>
-
-          <Campo rotulo="Rodada de som">
+      <Campo rotulo="Baralho">
+        <div className="space-y-2">
+          {(Object.keys(DECK_LABELS) as DeckModeValue[]).map((modo) => (
             <Opcao
-              ativo={value.soundEvery > 0}
-              titulo={value.soundEvery > 0 ? 'Ligada' : 'Desligada'}
-              ajuda="A mão vira cartas de som e a mesa vota no melhor áudio."
-              onClick={() => set('soundEvery', value.soundEvery > 0 ? 0 : 3)}
+              key={modo}
+              ativo={value.deckMode === modo}
+              titulo={DECK_LABELS[modo].titulo}
+              ajuda={DECK_LABELS[modo].ajuda}
+              onClick={() => set('deckMode', modo)}
             />
-
-            {value.soundEvery > 0 && (
-              <Contador
-                rotulo="A cada quantas rodadas"
-                valor={value.soundEvery}
-                min={SOUND_EVERY_RANGE.min}
-                max={SOUND_EVERY_RANGE.max}
-                onChange={(n) => set('soundEvery', n)}
-              />
-            )}
-          </Campo>
+          ))}
         </div>
 
-        <div className="space-y-3 border-t-[length:var(--border-w)] border-[var(--ink)] px-6 py-5">
-          {(conflito || error) && (
-            <p
-              role="alert"
-              className="rounded-[var(--radius)] bg-black/[0.06] px-3 py-2.5 text-xs font-bold"
-            >
-              {conflito ?? error}
-            </p>
-          )}
+        <Contador
+          rotulo="Cartas na mão"
+          valor={value.handSize}
+          min={HAND_RANGE.min}
+          max={HAND_RANGE.max}
+          onChange={(n) => set('handSize', n)}
+        />
+      </Campo>
 
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={onCancel} className="flex-1">
-              Voltar
-            </Button>
-            <Button
-              onClick={onConfirm}
-              disabled={pending || conflito !== null}
-              className="flex-1"
-            >
-              {pending ? <Loader2 className="animate-spin" /> : 'Criar'}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <Campo rotulo="Prazo da rodada">
+        <Segmentado
+          opcoes={[
+            ...TURN_PRESETS.map((s) => ({
+              valor: String(s),
+              rotulo: `${s}s`,
+            })),
+            { valor: '0', rotulo: 'Sem prazo' },
+          ]}
+          valor={String(value.turnSeconds)}
+          onChange={(v) => set('turnSeconds', Number(v))}
+        />
+        <p className="text-xs font-semibold text-[var(--ink-soft)]">
+          {value.turnSeconds > 0
+            ? `Vale para jogar e para votar. Quem não agir em ${value.turnSeconds}s entra com uma escolha sorteada, e a rodada segue.`
+            : 'A rodada espera por todos. Um jogador ausente trava a mesa.'}
+        </p>
+      </Campo>
+
+      <Campo rotulo="Rodada de som">
+        <Opcao
+          ativo={value.soundEvery > 0}
+          titulo={value.soundEvery > 0 ? 'Ligada' : 'Desligada'}
+          ajuda="A mão vira cartas de som e a mesa vota no melhor áudio."
+          icone={
+            value.soundEvery > 0 ? <Volume2 size={22} /> : <VolumeX size={22} />
+          }
+          onClick={() => set('soundEvery', value.soundEvery > 0 ? 0 : 3)}
+        />
+
+        {value.soundEvery > 0 && (
+          <Contador
+            rotulo="A cada quantas rodadas"
+            valor={value.soundEvery}
+            min={SOUND_EVERY_RANGE.min}
+            max={SOUND_EVERY_RANGE.max}
+            onChange={(n) => set('soundEvery', n)}
+          />
+        )}
+      </Campo>
     </div>
   )
 }
@@ -265,16 +207,24 @@ function Campo({
   )
 }
 
-/** Cartao selecionavel com titulo e explicacao. */
+/**
+ * Cartao selecionavel com titulo e explicacao.
+ *
+ * `icone` e opcional: a rodada de som usa um, porque ligada e desligada sao
+ * duas palavras parecidas num cartao de texto igual aos outros, e a diferenca
+ * passava batida. O icone diz o estado antes de alguem ler.
+ */
 function Opcao({
   ativo,
   titulo,
   ajuda,
+  icone,
   onClick,
 }: {
   ativo: boolean
   titulo: string
   ajuda: string
+  icone?: React.ReactNode
   onClick: () => void
 }) {
   return (
@@ -286,20 +236,36 @@ function Opcao({
         onClick()
       }}
       className={cn(
-        'w-full rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] p-3 text-left transition-colors',
+        'flex w-full items-center gap-3 rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] p-3 text-left transition-colors',
         ativo
           ? 'bg-[var(--ink)] text-[var(--paper)]'
           : 'bg-[var(--paper)] hover:bg-black/5'
       )}
     >
-      <span className="block text-sm font-bold">{titulo}</span>
-      <span
-        className={cn(
-          'block text-xs font-semibold',
-          ativo ? 'opacity-75' : 'text-[var(--ink-soft)]'
-        )}
-      >
-        {ajuda}
+      {icone && (
+        <span
+          aria-hidden
+          className={cn(
+            'grid size-11 shrink-0 place-items-center rounded-[var(--radius)] border-[length:var(--border-w)]',
+            ativo
+              ? 'border-[var(--paper)] bg-[var(--paper)] text-[var(--ink)]'
+              : 'border-[var(--ink)] text-[var(--ink)]'
+          )}
+        >
+          {icone}
+        </span>
+      )}
+
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold">{titulo}</span>
+        <span
+          className={cn(
+            'block text-xs font-semibold',
+            ativo ? 'opacity-75' : 'text-[var(--ink-soft)]'
+          )}
+        >
+          {ajuda}
+        </span>
       </span>
     </button>
   )
