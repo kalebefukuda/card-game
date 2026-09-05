@@ -8,12 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Logo } from '@/components/brand/Logo'
 import { Mark } from '@/components/brand/Mark'
 import { SoundControl } from '@/components/sound/SoundControl'
-import {
-  GameOptionsDialog,
-  DEFAULT_OPTIONS,
-  optionsConflict,
-  type GameOptionsValue,
-} from '@/components/game/GameOptions'
 import { loadName, saveName, savePlayerId } from '@/lib/session'
 import { MAX_NAME_LENGTH, ROOM_CODE_LENGTH } from '@/lib/constants'
 
@@ -22,9 +16,6 @@ export default function Home() {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState<'create' | 'join' | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [options, setOptions] = useState<GameOptionsValue>(DEFAULT_OPTIONS)
-  const [optionsOpen, setOptionsOpen] = useState(false)
-  const [optionsError, setOptionsError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => setName(loadName()), [])
@@ -35,36 +26,15 @@ export default function Home() {
     return true
   }
 
-  /** O botao da tela abre as opcoes; a sala nasce do dialogo. */
-  const openOptions = () => {
+  /*
+   * A sala nasce em /new-game, nao aqui: os ajustes viraram tela propria. Este
+   * botao so garante o nome, que /new-game le da sessao, e navega.
+   */
+  const createRoom = () => {
     if (needName()) return
-    setError(null)
-    setOptionsError(null)
-    setOptionsOpen(true)
-  }
-
-  const createRoom = async () => {
-    if (optionsConflict(options)) return
+    saveName(name.trim())
     setBusy('create')
-    setOptionsError(null)
-    try {
-      const res = await fetch('/api/create-room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, ...options }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Não consegui criar a sala.')
-      saveName(name.trim())
-      savePlayerId(data.code, data.playerId)
-      router.push(`/game/${data.code}`)
-    } catch (e) {
-      // O erro fica no dialogo, onde a pessoa esta olhando.
-      setOptionsError(
-        e instanceof Error ? e.message : 'Sem conexão com o servidor.'
-      )
-      setBusy(null)
-    }
+    router.push('/new-game')
   }
 
   const joinRoom = async () => {
@@ -131,7 +101,7 @@ export default function Home() {
 
         <Button
           size="lg"
-          onClick={openOptions}
+          onClick={createRoom}
           disabled={busy !== null}
           className="mt-6 w-full"
         >
@@ -194,20 +164,6 @@ export default function Home() {
           <WalletCards /> Ver o baralho
         </Button>
       </main>
-
-      {optionsOpen && (
-        <GameOptionsDialog
-          value={options}
-          onChange={setOptions}
-          onConfirm={createRoom}
-          onCancel={() => {
-            if (busy === 'create') return
-            setOptionsOpen(false)
-          }}
-          pending={busy === 'create'}
-          error={optionsError}
-        />
-      )}
     </div>
   )
 }
