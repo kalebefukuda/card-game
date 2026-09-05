@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, Crown, Hourglass } from 'lucide-react'
+import { Check, Crown, Hourglass, Skull } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { GameState } from '@/lib/gameState'
 
@@ -16,6 +16,8 @@ export function Scoreboard({
   const inRound = state.status === 'IN_PROGRESS'
 
   const statusFor = (player: GameState['players'][number]) => {
+    // Quem saiu nao esta escolhendo nem votando: a lapide substitui o status.
+    if (player.hasLeft) return null
     if (!inRound || !phase) return null
     if (phase === 'SUBMITTING')
       return player.hasSubmitted
@@ -44,17 +46,41 @@ export function Scoreboard({
               key={player.id}
               className={cn(
                 'flex items-center gap-2 border-t border-[var(--line-soft)] px-4 py-2.5 first:border-t-0',
-                player.id === youId && 'bg-black/5'
+                player.id === youId && 'bg-black/5',
+                player.hasLeft && 'bg-[repeating-linear-gradient(135deg,transparent,transparent_6px,rgba(0,0,0,0.05)_6px,rgba(0,0,0,0.05)_12px)]'
               )}
             >
-              <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                <span className="truncate font-bold">{player.name}</span>
-                {player.isHost && (
-                  <Crown size={14} className="shrink-0" aria-label="host" />
-                )}
-                {player.id === youId && (
-                  <span className="kicker shrink-0 text-[9px] text-[var(--ink-soft)]">
-                    você
+              {/*
+               * A lapide vai embaixo do nome, e nao ao lado: na coluna estreita
+               * do placar as duas coisas na mesma linha espremiam o nome ate
+               * "D…", e um placar que nao diz quem quitou nao serve para nada.
+               */}
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  {player.hasLeft && (
+                    <Skull size={14} className="shrink-0" aria-hidden />
+                  )}
+                  <span
+                    className={cn(
+                      'truncate font-bold',
+                      player.hasLeft && 'text-[var(--ink-soft)] line-through'
+                    )}
+                  >
+                    {player.name}
+                  </span>
+                  {player.isHost && !player.hasLeft && (
+                    <Crown size={14} className="shrink-0" aria-label="host" />
+                  )}
+                  {player.id === youId && !player.hasLeft && (
+                    <span className="kicker shrink-0 text-[9px] text-[var(--ink-soft)]">
+                      você
+                    </span>
+                  )}
+                </span>
+
+                {player.hasLeft && (
+                  <span className="kicker text-[9px] text-[var(--ink-soft)]">
+                    vacilão quitou
                   </span>
                 )}
               </span>
@@ -73,7 +99,12 @@ export function Scoreboard({
                 </span>
               )}
 
-              <span className="w-7 shrink-0 text-right font-bold tabular-nums">
+              <span
+                className={cn(
+                  'w-7 shrink-0 text-right font-bold tabular-nums',
+                  player.hasLeft && 'text-[var(--ink-soft)]'
+                )}
+              >
                 {player.score}
               </span>
             </li>
