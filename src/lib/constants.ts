@@ -25,6 +25,14 @@ export const SOUND_HAND_SIZE = 3
 export const SOUND_EVERY_RANGE = { min: 2, max: 10 } as const
 
 /**
+ * Cartas de imagem na mao. Menor que a de texto pelo mesmo motivo da de som: a
+ * biblioteca tem poucas dezenas, e mao grande faria dois jogadores caírem com
+ * a mesma imagem na mesa.
+ */
+export const IMAGE_HAND_SIZE = 3
+export const IMAGE_EVERY_RANGE = { min: 2, max: 10 } as const
+
+/**
  * Prazo de cada fase da rodada, em segundos. 0 desliga.
  *
  * O minimo de 15s nao e enfeite: abaixo disso nem da tempo de ler as cartas da

@@ -11,6 +11,7 @@ import {
   DEFAULT_TARGET_SCORE,
   DEFAULT_ROUND_LIMIT,
   SOUND_EVERY_RANGE,
+  IMAGE_EVERY_RANGE,
   TURN_RANGE,
   DEFAULT_TURN_SECONDS,
 } from '@/lib/constants'
@@ -107,6 +108,16 @@ export function normalizeGameOptions(body: Record<string, unknown>) {
           0
         )
 
+  const imageEvery =
+    body.imageEvery === undefined || body.imageEvery === null || Number(body.imageEvery) === 0
+      ? 0
+      : inteiroNoIntervalo(
+          body.imageEvery,
+          IMAGE_EVERY_RANGE,
+          'A frequencia da rodada de imagem',
+          0
+        )
+
   // 0 e o desligado, mesma logica da rodada de som.
   const turnSeconds =
     body.turnSeconds === undefined ||
@@ -141,6 +152,7 @@ export function normalizeGameOptions(body: Record<string, unknown>) {
     deckMode,
     handSize,
     soundEvery,
+    imageEvery,
     turnSeconds,
   }
 }

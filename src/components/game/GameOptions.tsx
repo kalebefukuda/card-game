@@ -1,6 +1,13 @@
 'use client'
 
-import { Minus, Plus, Volume2, VolumeX } from 'lucide-react'
+import {
+  Image as ImageIcon,
+  ImageOff,
+  Minus,
+  Plus,
+  Volume2,
+  VolumeX,
+} from 'lucide-react'
 import { playSound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
 import {
@@ -8,6 +15,7 @@ import {
   ROUNDS_RANGE,
   SCORE_RANGE,
   SOUND_EVERY_RANGE,
+  IMAGE_EVERY_RANGE,
   DEFAULT_TARGET_SCORE,
   DEFAULT_ROUND_LIMIT,
   DEFAULT_TURN_SECONDS,
@@ -31,6 +39,8 @@ export type GameOptionsValue = {
   handSize: number
   /** A cada quantas rodadas entra uma de som. 0 desliga. */
   soundEvery: number
+  /** A cada quantas rodadas entra uma de imagem. 0 desliga. */
+  imageEvery: number
   /** Segundos por fase da rodada. 0 desliga o prazo. */
   turnSeconds: number
 }
@@ -42,6 +52,7 @@ export const DEFAULT_OPTIONS: GameOptionsValue = {
   deckMode: 'DEPLETE',
   handSize: HAND_SIZE,
   soundEvery: 0,
+  imageEvery: 0,
   turnSeconds: DEFAULT_TURN_SECONDS,
 }
 
@@ -186,6 +197,39 @@ export function GameOptionsForm({
             max={SOUND_EVERY_RANGE.max}
             onChange={(n) => set('soundEvery', n)}
           />
+        )}
+      </Campo>
+
+      <Campo rotulo="Rodada de imagem">
+        <Opcao
+          ativo={value.imageEvery > 0}
+          titulo={value.imageEvery > 0 ? 'Ligada' : 'Desligada'}
+          ajuda="A mão vira figurinhas e memes, e a mesa vota na melhor imagem."
+          icone={
+            value.imageEvery > 0 ? (
+              <ImageIcon size={22} />
+            ) : (
+              <ImageOff size={22} />
+            )
+          }
+          onClick={() => set('imageEvery', value.imageEvery > 0 ? 0 : 3)}
+        />
+
+        {value.imageEvery > 0 && (
+          <Contador
+            rotulo="A cada quantas rodadas"
+            valor={value.imageEvery}
+            min={IMAGE_EVERY_RANGE.min}
+            max={IMAGE_EVERY_RANGE.max}
+            onChange={(n) => set('imageEvery', n)}
+          />
+        )}
+
+        {value.soundEvery > 0 && value.imageEvery > 0 && (
+          <p className="text-xs font-semibold text-[var(--ink-soft)]">
+            Quando as duas caem na mesma rodada, elas se revezam — uma vez som,
+            a próxima imagem.
+          </p>
         )}
       </Campo>
     </div>

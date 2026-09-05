@@ -14,10 +14,9 @@ import { promptCards } from '@/data/promptCards'
 /**
  * As duas ultimas abas nao listam nada de proposito.
  *
- * Os sons ficam escondidos porque a graca da rodada de som e nao saber o que
- * vem — ler a lista antes estragaria a surpresa na mesa. As imagens ainda nao
- * existem, e prometer uma aba vazia e melhor que fingir que o baralho e so
- * texto.
+ * A graca das rodadas de som e de imagem e nao saber o que vem: ler a lista
+ * antes estragaria a surpresa na mesa. A aba de imagem dizia "ta vindo" quando
+ * a rodada ainda nao existia; agora que existe, prometer seria mentira.
  */
 type Filtro = 'todas' | 'resposta' | 'pergunta' | 'som' | 'imagem'
 
@@ -27,8 +26,8 @@ const TEASERS: Record<'som' | 'imagem', { titulo: string; ajuda: string }> = {
     ajuda: 'Os sons só aparecem na rodada de som, e a graça é justamente descobrir na hora. Ligue a rodada de som ao criar a partida.',
   },
   imagem: {
-    titulo: 'ta vindo p@@a',
-    ajuda: 'Rodada de figurinha e meme. Ainda estamos trabalhando para trazer.',
+    titulo: 'misterioooo',
+    ajuda: 'Figurinha e meme só aparecem na rodada de imagem, e a graça é descobrir na hora. Ligue a rodada de imagem ao criar a partida.',
   },
 }
 

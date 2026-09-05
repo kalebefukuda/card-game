@@ -8,6 +8,7 @@ import {
 import { prisma } from '@/lib/prisma'
 import { GameError, fillPrompt } from '@/lib/game'
 import { getSoundLibrary } from '@/lib/soundLibrary'
+import { getImageLibrary } from '@/lib/imageLibrary'
 
 export type PlayerView = {
   id: string
@@ -29,12 +30,23 @@ export type SoundCardView = {
   gain: number
 }
 
+/** Carta de imagem pronta para exibir: a interface nunca monta URL sozinha. */
+export type ImageCardView = {
+  id: string
+  name: string
+  url: string
+  width: number
+  height: number
+}
+
 export type SubmissionView = {
   id: string
   card: string
   isMine: boolean
   /** Presente apenas em rodada de som. */
   sound: SoundCardView | null
+  /** Presente apenas em rodada de imagem. */
+  image: ImageCardView | null
 }
 
 export type RevealView = {
@@ -47,6 +59,8 @@ export type RevealView = {
   isMine: boolean
   /** Presente apenas em rodada de som. */
   sound: SoundCardView | null
+  /** Presente apenas em rodada de imagem. */
+  image: ImageCardView | null
 }
 
 export type GameState = {
@@ -58,6 +72,7 @@ export type GameState = {
   deckMode: DeckMode
   handSize: number
   soundEvery: number
+  imageEvery: number
   turnSeconds: number
   players: PlayerView[]
   you: {
@@ -66,8 +81,10 @@ export type GameState = {
     isHost: boolean
     score: number
     hand: string[]
-    /** Mao de som. Vazia fora de partida com rodada de som ligada. */
+    /** Mao de som. Vazia fora de uma rodada de som. */
     soundHand: SoundCardView[]
+    /** Mao de imagem. Vazia fora de uma rodada de imagem. */
+    imageHand: ImageCardView[]
   } | null
   round: {
     number: number
@@ -122,7 +139,10 @@ export async function getGameState(
    * Consultar aqui dobrava as consultas por requisicao e estourava o pool do
    * pgbouncer com tres jogadores em partida — ver soundLibrary.ts.
    */
-  const soundById = await getSoundLibrary()
+  const [soundById, imageById] = await Promise.all([
+    getSoundLibrary(),
+    getImageLibrary(),
+  ])
 
   const players: PlayerView[] = game.players.map((p) => ({
     id: p.id,
@@ -159,6 +179,9 @@ export async function getGameState(
               sound: s.soundCardId
                 ? (soundById.get(s.soundCardId) ?? null)
                 : null,
+              image: s.imageCardId
+                ? (imageById.get(s.imageCardId) ?? null)
+                : null,
             }))
         : [],
       reveal: isReveal
@@ -174,6 +197,9 @@ export async function getGameState(
               isMine: s.playerId === me?.id,
               sound: s.soundCardId
                 ? (soundById.get(s.soundCardId) ?? null)
+                : null,
+              image: s.imageCardId
+                ? (imageById.get(s.imageCardId) ?? null)
                 : null,
             }))
         : [],
@@ -193,6 +219,7 @@ export async function getGameState(
     deckMode: game.deckMode,
     handSize: game.handSize,
     soundEvery: game.soundEvery,
+    imageEvery: game.imageEvery,
     turnSeconds: game.turnSeconds,
     players,
     you: me
@@ -205,6 +232,9 @@ export async function getGameState(
           soundHand: me.soundHand
             .map((id) => soundById.get(id))
             .filter((s) => s !== undefined),
+          imageHand: me.imageHand
+            .map((id) => imageById.get(id))
+            .filter((i) => i !== undefined),
         }
       : null,
     round: roundView,
