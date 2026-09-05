@@ -1,8 +1,10 @@
 'use client'
 
-import { Minus, Plus, SlidersHorizontal } from 'lucide-react'
+import { useEffect } from 'react'
+import { Loader2, Minus, Plus } from 'lucide-react'
 import { playSound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import {
   HAND_RANGE,
   ROUNDS_RANGE,
@@ -10,11 +12,18 @@ import {
   SOUND_EVERY_RANGE,
   DEFAULT_TARGET_SCORE,
   DEFAULT_ROUND_LIMIT,
+  DEFAULT_TURN_SECONDS,
+  TURN_PRESETS,
   HAND_SIZE,
 } from '@/lib/constants'
 
 export type EndConditionValue = 'TARGET_SCORE' | 'ROUND_LIMIT'
-export type DeckModeValue = 'REFILL' | 'FRESH' | 'DEPLETE'
+/**
+ * REFILL saiu daqui: a mao mudava tao pouco entre rodadas que a mesa reclamava
+ * de jogar sempre as mesmas cartas. Continua no enum do banco porque partidas
+ * antigas gravaram esse valor, mas nao e mais oferecido.
+ */
+export type DeckModeValue = 'FRESH' | 'DEPLETE'
 
 export type GameOptionsValue = {
   endCondition: EndConditionValue
@@ -24,29 +33,28 @@ export type GameOptionsValue = {
   handSize: number
   /** A cada quantas rodadas entra uma de som. 0 desliga. */
   soundEvery: number
+  /** Segundos por fase da rodada. 0 desliga o prazo. */
+  turnSeconds: number
 }
 
 export const DEFAULT_OPTIONS: GameOptionsValue = {
   endCondition: 'TARGET_SCORE',
   targetScore: DEFAULT_TARGET_SCORE,
   roundLimit: DEFAULT_ROUND_LIMIT,
-  deckMode: 'REFILL',
+  deckMode: 'DEPLETE',
   handSize: HAND_SIZE,
   soundEvery: 0,
+  turnSeconds: DEFAULT_TURN_SECONDS,
 }
 
 const DECK_LABELS: Record<DeckModeValue, { titulo: string; ajuda: string }> = {
-  REFILL: {
-    titulo: 'Clássico',
-    ajuda: 'Joga uma carta, compra uma. A mão muda devagar.',
+  DEPLETE: {
+    titulo: 'Só diminui',
+    ajuda: 'Você começa com uma mão e ela nunca é reposta: cada rodada tem uma carta menos. A mão define quantas rodadas a partida dura.',
   },
   FRESH: {
     titulo: 'Mão nova',
-    ajuda: 'Sete cartas novas a cada rodada. Bem mais imprevisível.',
-  },
-  DEPLETE: {
-    titulo: 'Só diminui',
-    ajuda: 'A mão inicial é todo o seu estoque e define a duração da partida.',
+    ajuda: 'Cartas sorteadas de novo a cada rodada. A mão nunca é a mesma duas vezes.',
   },
 }
 
@@ -67,56 +75,64 @@ export function optionsConflict(v: GameOptionsValue): string | null {
   return null
 }
 
-export function GameOptions({
+/**
+ * Ajustes da partida, em dialogo.
+ *
+ * Antes eram uma secao recolhida na tela inicial, e ficavam invisiveis: quem
+ * criava a partida nem sabia que dava para escolher rodada de som ou prazo.
+ * Agora "Criar partida" abre isto, e a sala e criada daqui — as opcoes deixam
+ * de ser um detalhe escondido e passam a ser o passo da criacao.
+ */
+export function GameOptionsDialog({
   value,
   onChange,
-  open,
-  onToggle,
+  onConfirm,
+  onCancel,
+  pending = false,
+  error,
 }: {
   value: GameOptionsValue
   onChange: (v: GameOptionsValue) => void
-  open: boolean
-  onToggle: () => void
+  onConfirm: () => void
+  onCancel: () => void
+  pending?: boolean
+  error?: string | null
 }) {
   const set = <K extends keyof GameOptionsValue>(
     key: K,
     v: GameOptionsValue[K]
   ) => onChange({ ...value, [key]: v })
 
+  // Esc fecha: dialogo sem saida pelo teclado prende quem nao usa mouse.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
   const conflito = optionsConflict(value)
   const porPontos = value.endCondition === 'TARGET_SCORE'
 
-  // Em DEPLETE a mao dita a duracao, entao o resumo mostra isso e nao as rodadas.
-  const resumo = [
-    value.deckMode === 'DEPLETE'
-      ? `${value.handSize} rodadas`
-      : porPontos
-        ? `${value.targetScore} pts`
-        : `${value.roundLimit} rodadas`,
-    DECK_LABELS[value.deckMode].titulo.toLowerCase(),
-    ...(value.soundEvery > 0 ? [`som a cada ${value.soundEvery}`] : []),
-  ].join(' · ')
-
   return (
-    <div className="mt-6">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => {
-          playSound('click')
-          onToggle()
-        }}
-        className="flex w-full items-center gap-2 text-sm font-bold"
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 sm:p-5"
+      onClick={onCancel}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-opcoes"
+        onClick={(e) => e.stopPropagation()}
+        className="animate-rise flex max-h-[90dvh] w-full max-w-md flex-col rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--paper)] shadow-hard"
       >
-        <SlidersHorizontal size={16} />
-        Opções da partida
-        <span className="ml-auto font-semibold text-[var(--ink-soft)]">
-          {resumo}
-        </span>
-      </button>
+        <div className="border-b-[length:var(--border-w)] border-[var(--ink)] px-6 py-5">
+          <h2 id="titulo-opcoes" className="text-xl font-bold">
+            Como vão jogar?
+          </h2>
+        </div>
 
-      {open && (
-        <div className="mt-3 space-y-5 rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] p-4">
+        {/* Rola por dentro: em telas pequenas as opcoes nao caberiam de uma vez. */}
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
           <Campo rotulo="Como a partida acaba">
             <Segmentado
               opcoes={[
@@ -147,38 +163,15 @@ export function GameOptions({
 
           <Campo rotulo="Baralho">
             <div className="space-y-2">
-              {(Object.keys(DECK_LABELS) as DeckModeValue[]).map((modo) => {
-                const ativo = value.deckMode === modo
-                return (
-                  <button
-                    key={modo}
-                    type="button"
-                    aria-pressed={ativo}
-                    onClick={() => {
-                      playSound('click')
-                      set('deckMode', modo)
-                    }}
-                    className={cn(
-                      'w-full rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] p-3 text-left transition-colors',
-                      ativo
-                        ? 'bg-[var(--ink)] text-[var(--paper)]'
-                        : 'bg-[var(--paper)] hover:bg-black/5'
-                    )}
-                  >
-                    <span className="block text-sm font-bold">
-                      {DECK_LABELS[modo].titulo}
-                    </span>
-                    <span
-                      className={cn(
-                        'block text-xs font-semibold',
-                        ativo ? 'opacity-75' : 'text-[var(--ink-soft)]'
-                      )}
-                    >
-                      {DECK_LABELS[modo].ajuda}
-                    </span>
-                  </button>
-                )
-              })}
+              {(Object.keys(DECK_LABELS) as DeckModeValue[]).map((modo) => (
+                <Opcao
+                  key={modo}
+                  ativo={value.deckMode === modo}
+                  titulo={DECK_LABELS[modo].titulo}
+                  ajuda={DECK_LABELS[modo].ajuda}
+                  onClick={() => set('deckMode', modo)}
+                />
+              ))}
             </div>
 
             <Contador
@@ -190,33 +183,32 @@ export function GameOptions({
             />
           </Campo>
 
+          <Campo rotulo="Prazo da rodada">
+            <Segmentado
+              opcoes={[
+                ...TURN_PRESETS.map((s) => ({
+                  valor: String(s),
+                  rotulo: `${s}s`,
+                })),
+                { valor: '0', rotulo: 'Sem prazo' },
+              ]}
+              valor={String(value.turnSeconds)}
+              onChange={(v) => set('turnSeconds', Number(v))}
+            />
+            <p className="text-xs font-semibold text-[var(--ink-soft)]">
+              {value.turnSeconds > 0
+                ? `Vale para jogar e para votar. Quem não agir em ${value.turnSeconds}s entra com uma escolha sorteada, e a rodada segue.`
+                : 'A rodada espera por todos. Um jogador ausente trava a mesa.'}
+            </p>
+          </Campo>
+
           <Campo rotulo="Rodada de som">
-            <button
-              type="button"
-              aria-pressed={value.soundEvery > 0}
-              onClick={() => {
-                playSound('click')
-                set('soundEvery', value.soundEvery > 0 ? 0 : 3)
-              }}
-              className={cn(
-                'w-full rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] p-3 text-left transition-colors',
-                value.soundEvery > 0
-                  ? 'bg-[var(--ink)] text-[var(--paper)]'
-                  : 'bg-[var(--paper)] hover:bg-black/5'
-              )}
-            >
-              <span className="block text-sm font-bold">
-                {value.soundEvery > 0 ? 'Ligada' : 'Desligada'}
-              </span>
-              <span
-                className={cn(
-                  'block text-xs font-semibold',
-                  value.soundEvery > 0 ? 'opacity-75' : 'text-[var(--ink-soft)]'
-                )}
-              >
-                A mão vira cartas de som e a mesa vota no melhor áudio.
-              </span>
-            </button>
+            <Opcao
+              ativo={value.soundEvery > 0}
+              titulo={value.soundEvery > 0 ? 'Ligada' : 'Desligada'}
+              ajuda="A mão vira cartas de som e a mesa vota no melhor áudio."
+              onClick={() => set('soundEvery', value.soundEvery > 0 ? 0 : 3)}
+            />
 
             {value.soundEvery > 0 && (
               <Contador
@@ -228,17 +220,32 @@ export function GameOptions({
               />
             )}
           </Campo>
+        </div>
 
-          {conflito && (
+        <div className="space-y-3 border-t-[length:var(--border-w)] border-[var(--ink)] px-6 py-5">
+          {(conflito || error) && (
             <p
               role="alert"
               className="rounded-[var(--radius)] bg-black/[0.06] px-3 py-2.5 text-xs font-bold"
             >
-              {conflito}
+              {conflito ?? error}
             </p>
           )}
+
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={onCancel} className="flex-1">
+              Voltar
+            </Button>
+            <Button
+              onClick={onConfirm}
+              disabled={pending || conflito !== null}
+              className="flex-1"
+            >
+              {pending ? <Loader2 className="animate-spin" /> : 'Criar'}
+            </Button>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -255,6 +262,46 @@ function Campo({
       <p className="kicker text-[var(--ink-soft)]">{rotulo}</p>
       {children}
     </div>
+  )
+}
+
+/** Cartao selecionavel com titulo e explicacao. */
+function Opcao({
+  ativo,
+  titulo,
+  ajuda,
+  onClick,
+}: {
+  ativo: boolean
+  titulo: string
+  ajuda: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={ativo}
+      onClick={() => {
+        playSound('click')
+        onClick()
+      }}
+      className={cn(
+        'w-full rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] p-3 text-left transition-colors',
+        ativo
+          ? 'bg-[var(--ink)] text-[var(--paper)]'
+          : 'bg-[var(--paper)] hover:bg-black/5'
+      )}
+    >
+      <span className="block text-sm font-bold">{titulo}</span>
+      <span
+        className={cn(
+          'block text-xs font-semibold',
+          ativo ? 'opacity-75' : 'text-[var(--ink-soft)]'
+        )}
+      >
+        {ajuda}
+      </span>
+    </button>
   )
 }
 
@@ -281,7 +328,7 @@ function Segmentado({
               onChange(o.valor)
             }}
             className={cn(
-              'h-11 flex-1 rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] text-xs font-bold uppercase transition-colors',
+              'h-11 flex-1 rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] px-1 text-xs font-bold uppercase transition-colors',
               ativo
                 ? 'bg-[var(--ink)] text-[var(--paper)]'
                 : 'bg-[var(--paper)] text-[var(--ink-soft)] hover:bg-black/5'

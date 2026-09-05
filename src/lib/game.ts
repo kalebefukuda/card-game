@@ -78,6 +78,25 @@ function requirePlayer<T extends { id: string }>(
   return player
 }
 
+/**
+ * Passa a rodada para a votacao, uma vez so.
+ *
+ * Condicionar a fase atual evita renovar o prazo duas vezes quando o ultimo
+ * jogador e o prazo vencido chegam ao mesmo ponto ao mesmo tempo.
+ */
+async function abrirVotacao(roundId: string, turnSeconds: number) {
+  await prisma.round.updateMany({
+    where: { id: roundId, phase: RoundPhase.SUBMITTING },
+    // Prazo novo: votar tem o seu proprio tempo, contado do zero.
+    data: { phase: RoundPhase.VOTING, deadline: deadlineFor(turnSeconds) },
+  })
+}
+
+/** Quando a fase vence, ou null se o prazo esta desligado. */
+function deadlineFor(turnSeconds: number) {
+  return turnSeconds > 0 ? new Date(Date.now() + turnSeconds * 1000) : null
+}
+
 /** Uma rodada a cada `soundEvery` e de som. 0 desliga. */
 function roundKind(soundEvery: number, number: number): RoundKind {
   return soundEvery > 0 && number % soundEvery === 0
@@ -88,10 +107,11 @@ function roundKind(soundEvery: number, number: number): RoundKind {
 /**
  * Reparte a biblioteca de sons entre os jogadores, sem repetir entre eles.
  *
- * A mao de som nao e consumida ao longo da partida: com uma biblioteca de
- * poucas dezenas, gastar uma carta por rodada esgotaria em duas ou tres. Os
- * seus sons sao seus a partida inteira e voce escolhe o melhor para cada
- * pergunta — o que tambem garante que dois jogadores nunca tenham o mesmo som.
+ * Sorteada de novo a cada rodada de som. A primeira versao distribuia uma vez
+ * na partida inteira, porque com 10 sons na biblioteca gastar um por rodada
+ * esgotaria em duas — mas o efeito foi os mesmos tres sons aparecerem em todas
+ * as rodadas, e a repeticao ficou obvia jogando. Com a biblioteca maior, cabe
+ * sortear de novo, e e o que faz a rodada de som surpreender.
  */
 async function dealSoundHands(soundEvery: number, playerCount: number) {
   if (soundEvery <= 0) return []
@@ -137,7 +157,11 @@ export async function startGame(code: string, playerId: string) {
   const promptDeck = shuffle(promptCards)
   let answerDeck = shuffle(answerCards)
 
-  const soundHands = await dealSoundHands(game.soundEvery, game.players.length)
+  const primeiroKind = roundKind(game.soundEvery, 1)
+  const soundHands =
+    primeiroKind === RoundKind.SOUND
+      ? await dealSoundHands(game.soundEvery, game.players.length)
+      : []
 
   const hands = game.players.map((p, i) => {
     const { drawn, remaining } = draw(answerDeck, game.handSize, answerCards)
@@ -163,8 +187,9 @@ export async function startGame(code: string, playerId: string) {
         gameId: game.id,
         number: 1,
         prompt,
-        kind: roundKind(game.soundEvery, 1),
+        kind: primeiroKind,
         phase: RoundPhase.SUBMITTING,
+        deadline: deadlineFor(game.turnSeconds),
       },
     }),
   ])
@@ -233,10 +258,7 @@ export async function submitCard(
     where: { roundId: round.id },
   })
   if (submissionCount >= game.players.length) {
-    await prisma.round.update({
-      where: { id: round.id },
-      data: { phase: RoundPhase.VOTING },
-    })
+    await abrirVotacao(round.id, game.turnSeconds)
   }
 }
 
@@ -281,22 +303,36 @@ async function tallyRound(roundId: string, gameId: string) {
     include: { votes: true },
   })
 
-  const best = Math.max(...submissions.map((s) => s.votes.length))
+  const best = Math.max(0, ...submissions.map((s) => s.votes.length))
   // Empate pontua todos os empatados: mantem a partida andando sem desempate arbitrario.
   const winners = submissions.filter((s) => s.votes.length === best && best > 0)
 
-  await prisma.$transaction([
-    ...winners.map((w) =>
+  /*
+   * Fecha a fase antes de pontuar, e so quem conseguiu fechar pontua.
+   *
+   * O updateMany condicionado a fase e a trava: dois jogadores votando no mesmo
+   * instante — ou dois polls resolvendo o mesmo prazo vencido — chegam aqui
+   * juntos, e sem isto o vencedor levaria dois pontos pela mesma rodada.
+   */
+  const fechou = await prisma.round.updateMany({
+    where: { id: roundId, phase: { not: RoundPhase.REVEAL } },
+    data: {
+      phase: RoundPhase.REVEAL,
+      winnerId: winners[0]?.playerId ?? null,
+      // Prazo zerado: a revelacao espera o host, sem contagem na tela.
+      deadline: null,
+    },
+  })
+  if (fechou.count === 0) return
+
+  await prisma.$transaction(
+    winners.map((w) =>
       prisma.player.update({
         where: { id: w.playerId },
         data: { score: { increment: 1 } },
       })
-    ),
-    prisma.round.update({
-      where: { id: roundId },
-      data: { phase: RoundPhase.REVEAL, winnerId: winners[0]?.playerId ?? null },
-    }),
-  ])
+    )
+  )
 
   const game = await prisma.game.findUnique({
     where: { id: gameId },
@@ -344,6 +380,130 @@ function isGameOver(
   return players.some((p) => p.score >= game.targetScore)
 }
 
+/** Sorteia um item, ou null se a lista esta vazia. */
+function sorteia<T>(itens: readonly T[]): T | null {
+  if (itens.length === 0) return null
+  return itens[Math.floor(Math.random() * itens.length)]
+}
+
+/**
+ * Executa a escrita ignorando violacao de unicidade.
+ *
+ * Tres jogadores fazendo poll no mesmo instante disparam esta resolucao ao
+ * mesmo tempo. As restricoes @@unique de Submission e Vote garantem que so a
+ * primeira grava; as outras batem em P2002, que aqui e resultado esperado e nao
+ * erro. Sem isto, um prazo vencido geraria excecao para dois dos tres.
+ */
+async function ignorandoDuplicata(fn: () => Promise<unknown>) {
+  try {
+    await fn()
+  } catch (e) {
+    const code = (e as { code?: string }).code
+    if (code !== 'P2002') throw e
+  }
+}
+
+/**
+ * Resolve a rodada quando o prazo vence.
+ *
+ * Roda no caminho do polling, nao num cron: o estado ja e pedido a cada 1,5s
+ * por jogador, entao o prazo e conferido de graça. Consequencia aceita — se
+ * todos fecharem a aba, nada resolve; mas aí nao ha ninguem esperando.
+ *
+ * Quem nao jogou recebe uma carta sorteada da propria mao. Quem nao votou
+ * recebe um voto sorteado entre as cartas dos OUTROS: votar na propria seria
+ * transformar o prazo em jeito de pontuar sem participar.
+ */
+export async function resolveExpiredRound(code: string) {
+  const game = await loadGame(code)
+  const round = game.rounds[0]
+
+  if (game.status !== GameStatus.IN_PROGRESS || !round) return
+  if (!round.deadline || round.deadline.getTime() > Date.now()) return
+
+  if (round.phase === RoundPhase.SUBMITTING) {
+    const jogadas = await prisma.submission.findMany({
+      where: { roundId: round.id },
+      select: { playerId: true },
+    })
+    const jogaram = new Set(jogadas.map((j) => j.playerId))
+
+    for (const p of game.players) {
+      if (jogaram.has(p.id)) continue
+
+      if (round.kind === RoundKind.SOUND) {
+        const escolhido = sorteia(p.soundHand)
+        if (!escolhido) continue
+        const som = await prisma.soundCard.findUnique({ where: { id: escolhido } })
+        if (!som) continue
+        await ignorandoDuplicata(() =>
+          prisma.submission.create({
+            data: {
+              roundId: round.id,
+              playerId: p.id,
+              card: som.name,
+              soundCardId: escolhido,
+            },
+          })
+        )
+      } else {
+        const carta = sorteia(p.hand)
+        if (!carta) continue
+        const mao = [...p.hand]
+        mao.splice(mao.indexOf(carta), 1)
+        await ignorandoDuplicata(() =>
+          prisma.$transaction([
+            prisma.submission.create({
+              data: { roundId: round.id, playerId: p.id, card: carta },
+            }),
+            prisma.player.update({ where: { id: p.id }, data: { hand: mao } }),
+          ])
+        )
+      }
+    }
+
+    /*
+     * Passada a resolucao, quem nao tem jogada e porque nao tinha o que jogar
+     * — carta de som apagada do acervo entre o sorteio e o prazo, por exemplo.
+     * Esperar por essa pessoa deixaria a rodada parada para sempre, com o
+     * prazo vencido e ninguem conseguindo agir. Duas cartas na mesa ja dao uma
+     * votacao; menos que isso vai direto para a apuracao, sem vencedor.
+     */
+    const total = await prisma.submission.count({ where: { roundId: round.id } })
+    if (total >= 2) await abrirVotacao(round.id, game.turnSeconds)
+    else await tallyRound(round.id, game.id)
+    return
+  }
+
+  if (round.phase === RoundPhase.VOTING) {
+    const [votos, jogadas] = await Promise.all([
+      prisma.vote.findMany({
+        where: { roundId: round.id },
+        select: { voterId: true },
+      }),
+      prisma.submission.findMany({
+        where: { roundId: round.id },
+        select: { id: true, playerId: true },
+      }),
+    ])
+    const votaram = new Set(votos.map((v) => v.voterId))
+
+    for (const p of game.players) {
+      if (votaram.has(p.id)) continue
+      const alvo = sorteia(jogadas.filter((j) => j.playerId !== p.id))
+      if (!alvo) continue
+      await ignorandoDuplicata(() =>
+        prisma.vote.create({
+          data: { roundId: round.id, voterId: p.id, submissionId: alvo.id },
+        })
+      )
+    }
+
+    // Chegando aqui todo mundo votou ou nao tinha em quem votar: apura.
+    await tallyRound(round.id, game.id)
+  }
+}
+
 /** Host abre a proxima rodada: recompoe as maos e sorteia nova pergunta. */
 export async function nextRound(code: string, playerId: string) {
   const game = await loadGame(code)
@@ -357,6 +517,9 @@ export async function nextRound(code: string, playerId: string) {
   if (!round || round.phase !== RoundPhase.REVEAL)
     throw new GameError('A rodada ainda não terminou', 409)
 
+  const numero = round.number + 1
+  const kind = roundKind(game.soundEvery, numero)
+
   let answerDeck = [...game.answerDeck]
   const refills = game.players.map((p) => {
     // DEPLETE nao repoe nada: a mao inicial e todo o estoque da partida.
@@ -364,29 +527,32 @@ export async function nextRound(code: string, playerId: string) {
 
     // FRESH troca a mao inteira; o que sobrou nao volta pro baralho de
     // proposito, senao a carta descartada reaparece na rodada seguinte.
-    if (game.deckMode === DeckMode.FRESH) {
-      const { drawn, remaining } = draw(answerDeck, game.handSize, answerCards)
-      answerDeck = remaining
-      return { playerId: p.id, hand: drawn }
-    }
-
-    const missing = game.handSize - p.hand.length
-    if (missing <= 0) return null
-    const { drawn, remaining } = draw(answerDeck, missing, answerCards)
+    const { drawn, remaining } = draw(answerDeck, game.handSize, answerCards)
     answerDeck = remaining
-    return { playerId: p.id, hand: [...p.hand, ...drawn] }
+    return { playerId: p.id, hand: drawn }
   })
+
+  // Mao de som sorteada de novo, e so quando a rodada que abre e de som.
+  const soundHands =
+    kind === RoundKind.SOUND
+      ? await dealSoundHands(game.soundEvery, game.players.length)
+      : []
 
   let promptDeck = [...game.promptDeck]
   if (promptDeck.length === 0) promptDeck = shuffle(promptCards)
   const prompt = promptDeck.shift() as string
 
   await prisma.$transaction([
-    ...refills
-      .filter((r) => r !== null)
-      .map((r) =>
-        prisma.player.update({ where: { id: r.playerId }, data: { hand: r.hand } })
-      ),
+    ...game.players.map((p, i) => {
+      const refill = refills[i]
+      return prisma.player.update({
+        where: { id: p.id },
+        data: {
+          ...(refill ? { hand: refill.hand } : {}),
+          ...(soundHands.length ? { soundHand: soundHands[i] ?? [] } : {}),
+        },
+      })
+    }),
     prisma.game.update({
       where: { id: game.id },
       data: { promptDeck, answerDeck },
@@ -394,10 +560,11 @@ export async function nextRound(code: string, playerId: string) {
     prisma.round.create({
       data: {
         gameId: game.id,
-        number: round.number + 1,
+        number: numero,
         prompt,
-        kind: roundKind(game.soundEvery, round.number + 1),
+        kind,
         phase: RoundPhase.SUBMITTING,
+        deadline: deadlineFor(game.turnSeconds),
       },
     }),
   ])
