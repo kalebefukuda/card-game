@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { GameCard } from '@/components/game/GameCard'
 import { SoundCard } from '@/components/game/SoundCard'
+import { Countdown } from '@/components/game/Countdown'
 import { Scoreboard } from '@/components/game/Scoreboard'
 import { Mark } from '@/components/brand/Mark'
 import { Logo } from '@/components/brand/Logo'
@@ -573,6 +574,13 @@ function Round({
                   : 'Esperando o host puxar a próxima rodada…'}
               </p>
             </>
+          )}
+
+          {/* Some junto com o prazo: em REVEAL o servidor zera o deadline. */}
+          {round.deadline && (
+            <div className="pt-2">
+              <Countdown deadline={round.deadline} total={state.turnSeconds} />
+            </div>
           )}
         </div>
       </div>

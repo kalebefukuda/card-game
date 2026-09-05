@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Game" ADD COLUMN     "turnSeconds" INTEGER NOT NULL DEFAULT 60,
+ALTER COLUMN "deckMode" SET DEFAULT 'DEPLETE';
+
+-- AlterTable
+ALTER TABLE "Round" ADD COLUMN     "deadline" TIMESTAMP(3);

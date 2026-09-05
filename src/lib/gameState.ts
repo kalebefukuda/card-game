@@ -56,6 +56,7 @@ export type GameState = {
   deckMode: DeckMode
   handSize: number
   soundEvery: number
+  turnSeconds: number
   players: PlayerView[]
   you: {
     id: string
@@ -71,6 +72,10 @@ export type GameState = {
     prompt: string
     kind: RoundKind
     phase: RoundPhase
+    /// Instante em que a fase vence, em ISO, ou null sem prazo. Vai como
+    /// instante absoluto e nao como "faltam N segundos" para o relogio do
+    /// navegador nao virar a fonte da verdade.
+    deadline: string | null
     submittedCount: number
     votedCount: number
     submissions: SubmissionView[]
@@ -137,6 +142,7 @@ export async function getGameState(
       prompt: round.prompt,
       kind: round.kind,
       phase: round.phase,
+      deadline: round.deadline?.toISOString() ?? null,
       submittedCount: round.submissions.length,
       votedCount: round.votes.length,
       // Ordem estavel por id: embaralhar a cada poll faria as cartas dancarem na tela.
@@ -184,6 +190,7 @@ export async function getGameState(
     deckMode: game.deckMode,
     handSize: game.handSize,
     soundEvery: game.soundEvery,
+    turnSeconds: game.turnSeconds,
     players,
     you: me
       ? {

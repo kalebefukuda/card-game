@@ -23,11 +23,13 @@ model Game {
   /// Rodadas da partida. Usado quando endCondition = ROUND_LIMIT.
   roundLimit   Int          @default(8)
   /// Como a mao e reabastecida entre rodadas.
-  deckMode     DeckMode     @default(REFILL)
+  deckMode     DeckMode     @default(DEPLETE)
   /// Cartas na mao. Em DEPLETE, define quantas rodadas a partida aguenta.
   handSize     Int          @default(7)
   /// A cada quantas rodadas entra uma rodada de som. 0 desliga.
   soundEvery   Int          @default(0)
+  /// Segundos para cada fase da rodada. 0 desliga o prazo.
+  turnSeconds  Int          @default(60)
   /// Cartas-pergunta ainda nao usadas, embaralhadas no inicio da partida.
   promptDeck   String[]
   /// Cartas-resposta ainda nao distribuidas.
@@ -62,6 +64,10 @@ model Round {
   /// Rodada de texto ou de som. Define de que baralho a mao e jogada.
   kind        RoundKind    @default(TEXT)
   phase       RoundPhase   @default(SUBMITTING)
+  /// Quando a fase atual vence. Renovado a cada troca de fase; nulo quando o
+  /// prazo esta desligado. Fica no banco, e nao no navegador, para quem fechou
+  /// a aba nao travar a rodada dos outros.
+  deadline    DateTime?
   winnerId    String?
   createdAt   DateTime     @default(now())
   game        Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
@@ -133,9 +139,11 @@ enum EndCondition {
 }
 
 enum DeckMode {
-  /// Classico: joga uma carta, compra uma.
+  /// Legado. Joga uma carta, compra uma — a mao mudava tao pouco que a partida
+  /// parecia estatica, e por isso saiu da tela. Permanece no enum porque
+  /// partidas antigas gravaram este valor e removê-lo as tornaria ilegiveis.
   REFILL
-  /// Mao inteira nova a cada rodada.
+  /// Mao inteira nova, sorteada a cada rodada.
   FRESH
   /// Mao inicial que so diminui. Acabar as cartas encerra a partida.
   DEPLETE

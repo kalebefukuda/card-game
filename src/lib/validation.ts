@@ -11,6 +11,8 @@ import {
   DEFAULT_TARGET_SCORE,
   DEFAULT_ROUND_LIMIT,
   SOUND_EVERY_RANGE,
+  TURN_RANGE,
+  DEFAULT_TURN_SECONDS,
 } from '@/lib/constants'
 
 /** Nome de jogador: sem espacos nas pontas, nao vazio e com tamanho limitado. */
@@ -65,12 +67,16 @@ export function normalizeGameOptions(body: Record<string, unknown>) {
             throw new GameError('Condicao de fim invalida', 400)
           })()
 
+  /*
+   * REFILL nao entra mais por aqui, mesmo continuando no enum: partidas
+   * antigas gravaram esse valor e precisam seguir legiveis, mas criar uma nova
+   * com ele nao e mais possivel — a mao mudava tao pouco que a mesa reclamava
+   * de jogar sempre as mesmas cartas.
+   */
   const deckMode =
     body.deckMode === undefined
-      ? DeckMode.REFILL
-      : body.deckMode === DeckMode.REFILL ||
-          body.deckMode === DeckMode.FRESH ||
-          body.deckMode === DeckMode.DEPLETE
+      ? DeckMode.DEPLETE
+      : body.deckMode === DeckMode.FRESH || body.deckMode === DeckMode.DEPLETE
         ? (body.deckMode as DeckMode)
         : (() => {
             throw new GameError('Modo de baralho invalido', 400)
@@ -101,6 +107,21 @@ export function normalizeGameOptions(body: Record<string, unknown>) {
           0
         )
 
+  // 0 e o desligado, mesma logica da rodada de som.
+  const turnSeconds =
+    body.turnSeconds === undefined ||
+    body.turnSeconds === null ||
+    Number(body.turnSeconds) === 0
+      ? body.turnSeconds === undefined || body.turnSeconds === null
+        ? DEFAULT_TURN_SECONDS
+        : 0
+      : inteiroNoIntervalo(
+          body.turnSeconds,
+          TURN_RANGE,
+          'O prazo da rodada',
+          DEFAULT_TURN_SECONDS
+        )
+
   if (
     deckMode === DeckMode.DEPLETE &&
     endCondition === EndCondition.ROUND_LIMIT &&
@@ -113,5 +134,13 @@ export function normalizeGameOptions(body: Record<string, unknown>) {
     )
   }
 
-  return { endCondition, targetScore, roundLimit, deckMode, handSize, soundEvery }
+  return {
+    endCondition,
+    targetScore,
+    roundLimit,
+    deckMode,
+    handSize,
+    soundEvery,
+    turnSeconds,
+  }
 }
