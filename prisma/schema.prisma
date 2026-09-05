@@ -49,6 +49,12 @@ model Player {
   /// Ids de SoundCard na mao de som. Distribuida no inicio da partida.
   soundHand   String[]
   joinedAt    DateTime     @default(now())
+  /// Quando abandonou a partida em andamento. Null = ainda na mesa.
+  ///
+  /// A linha fica, em vez de ser apagada, porque as jogadas e os votos dele
+  /// continuam valendo nas rodadas ja disputadas — e porque a mesa merece ver
+  /// quem quitou. Quem sai do lobby e apagado de verdade: nao havia partida.
+  leftAt      DateTime?
   game        Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
   submissions Submission[]
   votes       Vote[]

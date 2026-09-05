@@ -16,6 +16,8 @@ export type PlayerView = {
   score: number
   hasSubmitted: boolean
   hasVoted: boolean
+  /// Quitou a partida em andamento. Continua na lista, com lapide.
+  hasLeft: boolean
 }
 
 /** Carta de som pronta para tocar: a interface nunca monta URL sozinha. */
@@ -129,6 +131,7 @@ export async function getGameState(
     score: p.score,
     hasSubmitted: !!round?.submissions.some((s) => s.playerId === p.id),
     hasVoted: !!round?.votes.some((v) => v.voterId === p.id),
+    hasLeft: p.leftAt !== null,
   }))
 
   let roundView: GameState['round'] = null

@@ -21,7 +21,24 @@ export async function POST(req: Request) {
     const existing = game.players.find(
       (p) => p.name.toLowerCase() === name.toLowerCase()
     )
-    if (existing) return { code: game.code, playerId: existing.id, rejoined: true }
+    if (existing) {
+      /*
+       * Voltar apaga a lapide. Quem quitou e se arrependeu volta para a mesa
+       * com o placar intacto — a saida marca quem nao esta jogando agora, nao
+       * uma punicao permanente. So nao ressuscita partida ja encerrada.
+       */
+      if (
+        existing.leftAt &&
+        (game.status === GameStatus.LOBBY ||
+          game.status === GameStatus.IN_PROGRESS)
+      ) {
+        await prisma.player.update({
+          where: { id: existing.id },
+          data: { leftAt: null },
+        })
+      }
+      return { code: game.code, playerId: existing.id, rejoined: true }
+    }
 
     if (game.status !== GameStatus.LOBBY)
       throw new GameError('Essa partida já começou', 409)

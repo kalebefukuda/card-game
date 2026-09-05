@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Search } from 'lucide-react'
+import { ArrowLeft, Image as ImageIcon, Search, Volume2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Mark } from '@/components/brand/Mark'
@@ -11,7 +11,26 @@ import { SoundControl } from '@/components/sound/SoundControl'
 import { answerCards } from '@/data/answerCards'
 import { promptCards } from '@/data/promptCards'
 
-type Filtro = 'todas' | 'resposta' | 'pergunta'
+/**
+ * As duas ultimas abas nao listam nada de proposito.
+ *
+ * Os sons ficam escondidos porque a graca da rodada de som e nao saber o que
+ * vem — ler a lista antes estragaria a surpresa na mesa. As imagens ainda nao
+ * existem, e prometer uma aba vazia e melhor que fingir que o baralho e so
+ * texto.
+ */
+type Filtro = 'todas' | 'resposta' | 'pergunta' | 'som' | 'imagem'
+
+const TEASERS: Record<'som' | 'imagem', { titulo: string; ajuda: string }> = {
+  som: {
+    titulo: 'misterioooo',
+    ajuda: 'Os sons só aparecem na rodada de som, e a graça é justamente descobrir na hora. Ligue a rodada de som ao criar a partida.',
+  },
+  imagem: {
+    titulo: 'ta vindo p@@a',
+    ajuda: 'Rodada de figurinha e meme. Ainda estamos trabalhando para trazer.',
+  },
+}
 
 export default function VerCartas() {
   const [filtro, setFiltro] = useState<Filtro>('todas')
@@ -46,7 +65,11 @@ export default function VerCartas() {
     { valor: 'todas', rotulo: 'Todas' },
     { valor: 'pergunta', rotulo: 'Perguntas' },
     { valor: 'resposta', rotulo: 'Respostas' },
+    { valor: 'som', rotulo: 'Sons' },
+    { valor: 'imagem', rotulo: 'Imagens' },
   ]
+
+  const teaser = filtro === 'som' || filtro === 'imagem' ? filtro : null
 
   return (
     <div className="min-h-dvh">
@@ -63,23 +86,26 @@ export default function VerCartas() {
       </header>
 
       <main className="animate-rise mx-auto max-w-5xl px-4 py-6">
-        <div className="relative">
-          <Search
-            size={18}
-            className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-[var(--ink-soft)]"
-          />
-          <Input
-            placeholder="Procurar no baralho"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            className="pl-11"
-          />
-        </div>
+        {/* Sem campo de busca nas abas que nao listam nada. */}
+        {!teaser && (
+          <div className="relative">
+            <Search
+              size={18}
+              className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-[var(--ink-soft)]"
+            />
+            <Input
+              placeholder="Procurar no baralho"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="pl-11"
+            />
+          </div>
+        )}
 
         <div
           role="tablist"
           aria-label="Filtrar cartas"
-          className="mt-3 flex gap-2"
+          className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5"
         >
           {abas.map((aba) => {
             const ativa = filtro === aba.valor
@@ -93,7 +119,7 @@ export default function VerCartas() {
                   setFiltro(aba.valor)
                 }}
                 className={
-                  'h-11 flex-1 rounded-[var(--radius)] border-2 text-sm font-bold transition-colors ' +
+                  'h-11 rounded-[var(--radius)] border-2 text-sm font-bold transition-colors ' +
                   (ativa
                     ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
                     : 'border-[var(--ink)] bg-[var(--paper)] text-[var(--ink-soft)] hover:bg-black/5')
@@ -105,6 +131,30 @@ export default function VerCartas() {
           })}
         </div>
 
+        {teaser ? (
+          <div className="mt-4 flex aspect-[4/3] max-h-[26rem] flex-col items-center justify-center gap-4 rounded-[var(--radius)] border-2 border-b-[5px] border-[var(--ink)] bg-[var(--ink)] p-8 text-center text-[var(--paper)] [--mark-invert:1]">
+            <span aria-hidden className="opacity-80">
+              {teaser === 'som' ? (
+                <Volume2 size={56} />
+              ) : (
+                <ImageIcon size={56} />
+              )}
+            </span>
+            <p className="text-3xl font-extrabold text-balance sm:text-4xl">
+              {TEASERS[teaser].titulo}
+            </p>
+            <p className="max-w-sm font-semibold text-balance opacity-75">
+              {TEASERS[teaser].ajuda}
+            </p>
+            <span className="mt-2 flex items-center gap-1.5 opacity-70">
+              <Mark size={26} />
+              <span className="text-[7px] font-bold tracking-[0.16em] uppercase">
+                Meu Baralho
+              </span>
+            </span>
+          </div>
+        ) : (
+          <>
         <p className="mt-4 text-sm font-semibold text-[var(--ink-soft)]">
           {filtradas.length}{' '}
           {filtradas.length === 1 ? 'carta' : 'cartas'}
@@ -159,6 +209,8 @@ export default function VerCartas() {
               )
             })}
           </ul>
+        )}
+          </>
         )}
       </main>
     </div>

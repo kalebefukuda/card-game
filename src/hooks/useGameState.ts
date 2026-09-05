@@ -15,7 +15,20 @@ type Action = 'start' | 'submit' | 'vote' | 'next-round' | 'leave'
  * chamar refresh() quando chegar um evento, mantendo o polling como rede
  * de seguranca se a conexao cair.
  */
-export function useGameState(code: string, playerId: string | null) {
+export function useGameState(
+  code: string,
+  playerId: string | null,
+  /**
+   * So comeca a buscar quando o chamador ja sabe quem e o jogador.
+   *
+   * O playerId vem do localStorage, que so existe depois da montagem — e a
+   * primeira busca saia antes disso, sem identidade. A resposta vinha com
+   * `you: null` e a tela pedia o nome de quem acabou de digitar o nome, ate o
+   * poll seguinte corrigir. Segurar a primeira busca ate a identidade estar
+   * resolvida acaba com esse piscar.
+   */
+  enabled = true
+) {
   const [state, setState] = useState<GameState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -36,7 +49,7 @@ export function useGameState(code: string, playerId: string | null) {
   const inFlight = useRef(false)
 
   const refresh = useCallback(async () => {
-    if (inFlight.current) return
+    if (!enabled || inFlight.current) return
     inFlight.current = true
 
     const ticket = ++latest.current
@@ -65,9 +78,10 @@ export function useGameState(code: string, playerId: string | null) {
       inFlight.current = false
       if (ticket === latest.current) setLoading(false)
     }
-  }, [code, playerId])
+  }, [code, playerId, enabled])
 
   useEffect(() => {
+    if (!enabled) return
     refresh()
     const id = setInterval(refresh, POLL_INTERVAL)
 
@@ -84,7 +98,7 @@ export function useGameState(code: string, playerId: string | null) {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('focus', refresh)
     }
-  }, [refresh])
+  }, [refresh, enabled])
 
   /** Dispara uma acao e adota a resposta como novo estado, sem esperar o poll. */
   const act = useCallback(
