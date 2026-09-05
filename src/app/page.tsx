@@ -9,7 +9,7 @@ import { Logo } from '@/components/brand/Logo'
 import { Mark } from '@/components/brand/Mark'
 import { SoundControl } from '@/components/sound/SoundControl'
 import {
-  GameOptions,
+  GameOptionsDialog,
   DEFAULT_OPTIONS,
   optionsConflict,
   type GameOptionsValue,
@@ -24,6 +24,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [options, setOptions] = useState<GameOptionsValue>(DEFAULT_OPTIONS)
   const [optionsOpen, setOptionsOpen] = useState(false)
+  const [optionsError, setOptionsError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => setName(loadName()), [])
@@ -34,15 +35,18 @@ export default function Home() {
     return true
   }
 
-  const createRoom = async () => {
+  /** O botao da tela abre as opcoes; a sala nasce do dialogo. */
+  const openOptions = () => {
     if (needName()) return
-    const conflito = optionsConflict(options)
-    if (conflito) {
-      setOptionsOpen(true)
-      return setError(conflito)
-    }
-    setBusy('create')
     setError(null)
+    setOptionsError(null)
+    setOptionsOpen(true)
+  }
+
+  const createRoom = async () => {
+    if (optionsConflict(options)) return
+    setBusy('create')
+    setOptionsError(null)
     try {
       const res = await fetch('/api/create-room', {
         method: 'POST',
@@ -55,7 +59,10 @@ export default function Home() {
       savePlayerId(data.code, data.playerId)
       router.push(`/game/${data.code}`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Sem conexão com o servidor.')
+      // O erro fica no dialogo, onde a pessoa esta olhando.
+      setOptionsError(
+        e instanceof Error ? e.message : 'Sem conexão com o servidor.'
+      )
       setBusy(null)
     }
   }
@@ -122,18 +129,11 @@ export default function Home() {
           />
         </div>
 
-        <GameOptions
-          value={options}
-          onChange={setOptions}
-          open={optionsOpen}
-          onToggle={() => setOptionsOpen((v) => !v)}
-        />
-
         <Button
           size="lg"
-          onClick={createRoom}
+          onClick={openOptions}
           disabled={busy !== null}
-          className="mt-4 w-full"
+          className="mt-6 w-full"
         >
           {busy === 'create' ? (
             <Loader2 className="animate-spin" />
@@ -194,6 +194,20 @@ export default function Home() {
           <WalletCards /> Ver o baralho
         </Button>
       </main>
+
+      {optionsOpen && (
+        <GameOptionsDialog
+          value={options}
+          onChange={setOptions}
+          onConfirm={createRoom}
+          onCancel={() => {
+            if (busy === 'create') return
+            setOptionsOpen(false)
+          }}
+          pending={busy === 'create'}
+          error={optionsError}
+        />
+      )}
     </div>
   )
 }
