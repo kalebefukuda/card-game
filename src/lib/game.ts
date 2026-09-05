@@ -57,11 +57,20 @@ function draw(deck: string[], count: number, source: readonly string[]) {
   return { drawn, remaining }
 }
 
+/**
+ * Carrega a partida enxergando SO quem ainda esta na mesa.
+ *
+ * O filtro mora aqui, e nao em cada regra, de proposito: a engine compara o
+ * numero de jogadas e votos com o numero de jogadores em uma duzia de lugares,
+ * e bastava esquecer um para a rodada ficar esperando para sempre por alguem
+ * que fechou a aba. Quem saiu continua no banco — o placar e o historico
+ * precisam dele —, mas nao conta mais para nada que a rodada espere.
+ */
 async function loadGame(code: string) {
   const game = await prisma.game.findUnique({
     where: { code: code.toUpperCase() },
     include: {
-      players: { orderBy: { joinedAt: 'asc' } },
+      players: { where: { leftAt: null }, orderBy: { joinedAt: 'asc' } },
       rounds: { orderBy: { number: 'desc' }, take: 1 },
     },
   })
@@ -581,18 +590,96 @@ export async function nextRound(code: string, playerId: string) {
  * Jogador comum sair nao encerra nada: ele volta pelo mesmo link e a
  * reconexao ja existente o devolve ao lugar.
  */
+/**
+ * Jogador sai da partida.
+ *
+ * Antes so o host saia de verdade: quem nao era host apenas navegava para
+ * fora e continuava fantasma na mesa, com os outros esperando uma jogada que
+ * nunca vinha. Agora sair marca `leftAt`, e a mesa segue sem ele.
+ *
+ * No lobby a linha e apagada: nao havia partida, entao nao ha historico a
+ * preservar nem lapide a mostrar. Em partida a linha fica.
+ *
+ * Nao devolve nada: a rota responde com o estado da partida, e e de la que a
+ * tela tira o que mudou — o status e a lapide de quem saiu.
+ */
 export async function leaveGame(code: string, playerId: string) {
   const game = await loadGame(code)
   const player = requirePlayer(game.players, playerId)
+  const acabou =
+    game.status === GameStatus.FINISHED || game.status === GameStatus.ABANDONED
 
-  if (!player.isHost) return { ended: false }
-  if (game.status === GameStatus.FINISHED || game.status === GameStatus.ABANDONED)
-    return { ended: false }
+  // Partida encerrada: sair e so navegar, nao ha nada para interromper.
+  if (acabou) return
 
-  await prisma.game.update({
-    where: { id: game.id },
-    data: { status: GameStatus.ABANDONED },
+  if (player.isHost) {
+    await prisma.$transaction([
+      prisma.player.update({
+        where: { id: player.id },
+        data: { leftAt: new Date() },
+      }),
+      prisma.game.update({
+        where: { id: game.id },
+        data: { status: GameStatus.ABANDONED },
+      }),
+    ])
+    return
+  }
+
+  if (game.status === GameStatus.LOBBY) {
+    await prisma.player.delete({ where: { id: player.id } })
+    return
+  }
+
+  await prisma.player.update({
+    where: { id: player.id },
+    data: { leftAt: new Date() },
   })
 
-  return { ended: true }
+  /*
+   * Com menos de MIN_PLAYERS a partida nao tem como continuar: ninguem vota na
+   * propria carta, entao com dois jogadores toda rodada empata e ninguem
+   * pontua. Melhor encerrar com essa razao visivel do que deixar a mesa girar
+   * em falso.
+   */
+  const restantes = game.players.length - 1
+  if (restantes < MIN_PLAYERS) {
+    await prisma.game.update({
+      where: { id: game.id },
+      data: { status: GameStatus.ABANDONED },
+    })
+    return
+  }
+
+  /*
+   * A saida pode ter completado a fase: os que ficaram talvez ja tivessem
+   * jogado ou votado, e so faltava ele. Sem esta conferencia a rodada esperaria
+   * ate o prazo vencer por alguem que nao esta mais aqui.
+   */
+  await advanceIfComplete(code)
+}
+
+/**
+ * Fecha a fase se todos os que ficaram ja agiram.
+ *
+ * Usado depois de alguem sair: o alvo de "todos jogaram" acabou de diminuir, e
+ * a condicao pode ter passado a valer sem ninguem clicar em nada.
+ */
+async function advanceIfComplete(code: string) {
+  const game = await loadGame(code)
+  const round = game.rounds[0]
+  if (game.status !== GameStatus.IN_PROGRESS || !round) return
+
+  if (round.phase === RoundPhase.SUBMITTING) {
+    const jogadas = await prisma.submission.count({ where: { roundId: round.id } })
+    if (jogadas >= game.players.length && jogadas >= 2) {
+      await abrirVotacao(round.id, game.turnSeconds)
+    }
+    return
+  }
+
+  if (round.phase === RoundPhase.VOTING) {
+    const votos = await prisma.vote.count({ where: { roundId: round.id } })
+    if (votos >= game.players.length) await tallyRound(round.id, game.id)
+  }
 }

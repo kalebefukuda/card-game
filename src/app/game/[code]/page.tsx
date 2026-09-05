@@ -3,7 +3,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Check, Copy, Loader2, Pause, Play, Trophy } from 'lucide-react'
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  Loader2,
+  Pause,
+  Play,
+  Skull,
+  Trophy,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { GameCard } from '@/components/game/GameCard'
@@ -18,6 +27,11 @@ import { useGameState } from '@/hooks/useGameState'
 import type { RevealView, SoundCardView } from '@/lib/gameState'
 import { loadPlayerId, savePlayerId, loadName, saveName } from '@/lib/session'
 import { MAX_NAME_LENGTH, MIN_PLAYERS } from '@/lib/constants'
+
+/** Quem ainda esta jogando. Quem quitou continua na lista, com lapide. */
+function naMesa<T extends { hasLeft: boolean }>(players: T[]) {
+  return players.filter((p) => !p.hasLeft)
+}
 
 export default function GamePage() {
   const params = useParams<{ code: string }>()
@@ -34,7 +48,8 @@ export default function GamePage() {
 
   const { state, error, pending, loading, act, setError } = useGameState(
     roomCode,
-    playerId
+    playerId,
+    ready
   )
 
   /*
@@ -46,6 +61,8 @@ export default function GamePage() {
   const [confirmandoSaida, setConfirmandoSaida] = useState(false)
   const cue = useRef<string | null>(null)
   const knownPlayers = useRef<number | null>(null)
+  const quemJaSaiu = useRef<Set<string> | null>(null)
+  const [quitou, setQuitou] = useState<string | null>(null)
 
   useEffect(() => {
     if (!state) return
@@ -72,12 +89,39 @@ export default function GamePage() {
     }
 
     // Alguem entrou na sala: avisa quem esta esperando no lobby.
-    const count = state.players.length
+    const count = naMesa(state.players).length
     if (knownPlayers.current !== null && count > knownPlayers.current) {
       playSound('join')
     }
     knownPlayers.current = count
+
+    /*
+     * Alguem quitou. A lapide no placar e permanente, mas quem estava olhando a
+     * propria mao nao veria a mudanca acontecer — por isso tambem um aviso no
+     * topo, no momento em que acontece. O primeiro estado nunca avisa: chegar
+     * numa sala onde alguem ja tinha saido nao e um evento.
+     */
+    const saidos = new Set(
+      state.players.filter((p) => p.hasLeft).map((p) => p.id)
+    )
+    if (quemJaSaiu.current) {
+      const novo = state.players.find(
+        (p) => p.hasLeft && !quemJaSaiu.current?.has(p.id)
+      )
+      if (novo) {
+        setQuitou(novo.name)
+        playSound('roundLose')
+      }
+    }
+    quemJaSaiu.current = saidos
   }, [state])
+
+  // O aviso some sozinho: e um acontecimento, nao um estado da tela.
+  useEffect(() => {
+    if (!quitou) return
+    const id = window.setTimeout(() => setQuitou(null), 6000)
+    return () => window.clearTimeout(id)
+  }, [quitou])
 
   if (!ready || (loading && !state)) {
     return (
@@ -135,11 +179,13 @@ export default function GamePage() {
    * ela entra aqui e nao so o roundLimit.
    */
   /*
-   * So o host encerra, e so enquanto a partida esta viva. Depois de acabar,
-   * sair e so navegar — nao ha nada para interromper.
+   * Sair pede confirmacao de qualquer jogador, nao so do host: para o host a
+   * saida encerra a partida de todos, e para os outros custa as cartas e o
+   * lugar na mesa. Depois de acabar, sair e so navegar — nao ha o que
+   * interromper, e o clique volta a ser um link comum.
    */
   const podeEncerrar =
-    isHost && (state.status === 'LOBBY' || state.status === 'IN_PROGRESS')
+    state.status === 'LOBBY' || state.status === 'IN_PROGRESS'
 
   const roundsTotal =
     state.deckMode === 'DEPLETE'
@@ -191,6 +237,16 @@ export default function GamePage() {
         </p>
       )}
 
+      {quitou && (
+        <p
+          role="status"
+          className="animate-rise flex items-center justify-center gap-2 bg-[var(--ink)] px-4 py-2.5 text-center text-sm font-bold text-white"
+        >
+          <Skull size={16} aria-hidden />
+          {quitou} quitou. Vacilão.
+        </p>
+      )}
+
       <main className="mx-auto grid max-w-5xl gap-6 px-4 py-6 md:grid-cols-[1fr_260px]">
         <section className="animate-rise">
           {state.status === 'LOBBY' && (
@@ -219,7 +275,14 @@ export default function GamePage() {
           )}
 
           {state.status === 'ABANDONED' && (
-            <Abandoned onHome={() => router.push('/')} />
+            <Abandoned
+              motivo={
+                state.players.some((p) => p.isHost && p.hasLeft)
+                  ? 'host'
+                  : 'poucos'
+              }
+              onHome={() => router.push('/')}
+            />
           )}
         </section>
 
@@ -230,6 +293,7 @@ export default function GamePage() {
 
       {confirmandoSaida && (
         <LeaveDialog
+          isHost={isHost}
           emAndamento={state.status === 'IN_PROGRESS'}
           pending={pending}
           onCancel={() => setConfirmandoSaida(false)}
@@ -251,11 +315,13 @@ export default function GamePage() {
  * numa sala sem quem puxasse a proxima rodada.
  */
 function LeaveDialog({
+  isHost,
   emAndamento,
   pending,
   onCancel,
   onConfirm,
 }: {
+  isHost: boolean
   emAndamento: boolean
   pending: boolean
   onCancel: () => void
@@ -281,12 +347,16 @@ function LeaveDialog({
         className="animate-rise w-full max-w-sm rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--paper)] p-6 shadow-hard"
       >
         <h2 id="titulo-sair" className="text-xl font-bold">
-          Encerrar a partida?
+          {isHost ? 'Encerrar a partida?' : 'Sair da partida?'}
         </h2>
         <p className="mt-2 font-semibold text-[var(--ink-soft)]">
-          {emAndamento
-            ? 'Você é o host. Se sair agora, a partida acaba para todos e ninguém vence.'
-            : 'Você é o host. Se sair agora, a sala fecha para todos.'}
+          {isHost
+            ? emAndamento
+              ? 'Você é o host. Se sair agora, a partida acaba para todos e ninguém vence.'
+              : 'Você é o host. Se sair agora, a sala fecha para todos.'
+            : emAndamento
+              ? 'A partida continua sem você, e a mesa vai ver que você quitou. Dá para voltar entrando com o mesmo nome.'
+              : 'Você sai da sala e a partida segue. Dá para voltar entrando com o mesmo código.'}
         </p>
 
         <div className="mt-6 flex gap-3">
@@ -299,7 +369,13 @@ function LeaveDialog({
             Continuar jogando
           </Button>
           <Button onClick={onConfirm} disabled={pending} className="flex-1">
-            {pending ? <Loader2 className="animate-spin" /> : 'Encerrar'}
+            {pending ? (
+              <Loader2 className="animate-spin" />
+            ) : isHost ? (
+              'Encerrar'
+            ) : (
+              'Sair'
+            )}
           </Button>
         </div>
       </div>
@@ -307,15 +383,31 @@ function LeaveDialog({
   )
 }
 
-/** Tela de quem ficou quando o host abandonou a partida. */
-function Abandoned({ onHome }: { onHome: () => void }) {
+/**
+ * Tela de quem ficou quando a partida acabou sem vencedor.
+ *
+ * O motivo vem de quem saiu: se o host quitou, a partida cai junto; se sobrou
+ * gente de menos, ela nao tinha como continuar — com dois jogadores ninguem
+ * vota na propria carta, entao toda rodada empataria.
+ */
+function Abandoned({
+  motivo,
+  onHome,
+}: {
+  motivo: 'host' | 'poucos'
+  onHome: () => void
+}) {
   return (
     <div className="flex flex-col items-center gap-5 text-center">
       <Mark size={104} />
       <div>
-        <h1 className="text-3xl font-extrabold">O host saiu</h1>
+        <h1 className="text-3xl font-extrabold">
+          {motivo === 'host' ? 'O host saiu' : 'Ficou gente de menos'}
+        </h1>
         <p className="mt-2 font-semibold text-[var(--ink-soft)]">
-          A partida foi encerrada. Ninguém venceu esta — comecem outra.
+          {motivo === 'host'
+            ? 'A partida foi encerrada. Ninguém venceu esta — comecem outra.'
+            : `São necessários ${MIN_PLAYERS} jogadores. Chamem mais gente e comecem outra.`}
         </p>
       </div>
       <Button size="lg" onClick={onHome} className="w-full max-w-xs">
@@ -438,7 +530,8 @@ function Lobby({
   pending: boolean
   onStart: () => void
 }) {
-  const missing = MIN_PLAYERS - state.players.length
+  const naSala = naMesa(state.players)
+  const missing = MIN_PLAYERS - naSala.length
 
   return (
     <div className="space-y-6">
@@ -451,7 +544,7 @@ function Lobby({
       </div>
 
       <ul className="grid gap-2.5 sm:grid-cols-2">
-        {state.players.map((p) => (
+        {naSala.map((p) => (
           <li
             key={p.id}
             className="flex items-center gap-2.5 rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--ink)] bg-[var(--paper)] px-4 py-3 font-bold"
@@ -530,7 +623,7 @@ function Round({
 }) {
   const round = state.round!
   const you = state.you!
-  const total = state.players.length
+  const total = naMesa(state.players).length
   const youSubmitted = state.players.find((p) => p.id === you.id)?.hasSubmitted
 
   return (
