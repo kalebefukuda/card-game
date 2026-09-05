@@ -28,6 +28,8 @@ model Game {
   handSize     Int          @default(7)
   /// A cada quantas rodadas entra uma rodada de som. 0 desliga.
   soundEvery   Int          @default(0)
+  /// A cada quantas rodadas entra uma rodada de imagem. 0 desliga.
+  imageEvery   Int          @default(0)
   /// Segundos para cada fase da rodada. 0 desliga o prazo.
   turnSeconds  Int          @default(60)
   /// Cartas-pergunta ainda nao usadas, embaralhadas no inicio da partida.
@@ -46,8 +48,10 @@ model Player {
   score       Int          @default(0)
   /// Mao do jogador: cartas-resposta que ele pode jogar.
   hand        String[]
-  /// Ids de SoundCard na mao de som. Distribuida no inicio da partida.
+  /// Ids de SoundCard na mao de som. Sorteada a cada rodada de som.
   soundHand   String[]
+  /// Ids de ImageCard na mao de imagem. Sorteada a cada rodada de imagem.
+  imageHand   String[]
   joinedAt    DateTime     @default(now())
   /// Quando abandonou a partida em andamento. Null = ainda na mesa.
   ///
@@ -92,9 +96,12 @@ model Submission {
   card        String
   /// Preenchido apenas em rodada de som.
   soundCardId String?
+  /// Preenchido apenas em rodada de imagem.
+  imageCardId String?
   round       Round      @relation(fields: [roundId], references: [id], onDelete: Cascade)
   player      Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
   sound       SoundCard? @relation(fields: [soundCardId], references: [id], onDelete: SetNull)
+  image       ImageCard? @relation(fields: [imageCardId], references: [id], onDelete: SetNull)
   votes       Vote[]
 
   /// Um jogador joga no maximo uma carta por rodada.
@@ -132,9 +139,30 @@ model SoundCard {
   submissions Submission[]
 }
 
+/// Biblioteca de imagens. Espelha SoundCard de proposito, em vez de as duas
+/// virarem uma tabela so com um campo `kind`: unificar exigiria migrar a chave
+/// estrangeira que as submissoes ja gravadas usam, e o ganho seria umas poucas
+/// linhas de codigo parecido. Duplicar aqui nao arrisca o que ja esta no ar.
+model ImageCard {
+  id          String       @id @default(uuid())
+  /// Caminho do objeto dentro do bucket "images".
+  path        String       @unique
+  /// Nome mostrado como legenda e usado no historico.
+  name        String
+  /// Proporcao do arquivo, para a carta reservar o espaco certo antes de
+  /// carregar e a grade nao pular quando as imagens chegam.
+  width       Int          @default(0)
+  height      Int          @default(0)
+  /// Permite tirar uma imagem de circulacao sem apagar o historico.
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  submissions Submission[]
+}
+
 enum RoundKind {
   TEXT
   SOUND
+  IMAGE
 }
 
 enum EndCondition {

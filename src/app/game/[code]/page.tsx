@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { GameCard } from '@/components/game/GameCard'
 import { SoundCard } from '@/components/game/SoundCard'
+import { ImageCard, nomeLegivel } from '@/components/game/ImageCard'
 import { Countdown } from '@/components/game/Countdown'
 import { Scoreboard } from '@/components/game/Scoreboard'
 import { Mark } from '@/components/brand/Mark'
@@ -265,6 +266,7 @@ export default function GamePage() {
               isHost={isHost}
               onSubmit={(card) => act('submit', { card })}
               onSubmitSound={(soundCardId) => act('submit', { soundCardId })}
+              onSubmitImage={(imageCardId) => act('submit', { imageCardId })}
               onVote={(submissionId) => act('vote', { submissionId })}
               onNext={() => act('next-round')}
             />
@@ -610,6 +612,7 @@ function Round({
   isHost,
   onSubmit,
   onSubmitSound,
+  onSubmitImage,
   onVote,
   onNext,
 }: {
@@ -618,6 +621,7 @@ function Round({
   isHost: boolean
   onSubmit: (card: string) => void
   onSubmitSound: (soundCardId: string) => void
+  onSubmitImage: (imageCardId: string) => void
   onVote: (submissionId: string) => void
   onNext: () => void
 }) {
@@ -692,6 +696,20 @@ function Round({
         </SoundGrid>
       )}
 
+      {round.phase === 'SUBMITTING' && !youSubmitted && round.kind === 'IMAGE' && (
+        <SoundGrid>
+          {you.imageHand.map((img) => (
+            <ImageCard
+              key={img.id}
+              image={img}
+              actionLabel="Jogar esta"
+              disabled={pending}
+              onAction={() => onSubmitImage(img.id)}
+            />
+          ))}
+        </SoundGrid>
+      )}
+
       {round.phase === 'SUBMITTING' && !youSubmitted && round.kind === 'TEXT' && (
         <CardGrid>
           {you.hand.map((card, i) => (
@@ -712,6 +730,24 @@ function Round({
               <SoundCard
                 key={s.id}
                 sound={s.sound}
+                actionLabel="Votar nesta"
+                badge={s.isMine ? 'sua' : undefined}
+                selected={round.yourVoteId === s.id}
+                disabled={s.isMine || !!round.yourVoteId || pending}
+                onAction={s.isMine ? undefined : () => onVote(s.id)}
+              />
+            ) : null
+          )}
+        </SoundGrid>
+      )}
+
+      {round.phase === 'VOTING' && round.kind === 'IMAGE' && (
+        <SoundGrid>
+          {round.submissions.map((s) =>
+            s.image ? (
+              <ImageCard
+                key={s.id}
+                image={s.image}
                 actionLabel="Votar nesta"
                 badge={s.isMine ? 'sua' : undefined}
                 selected={round.yourVoteId === s.id}
@@ -754,7 +790,24 @@ function Round({
                   'border-[var(--ink)] bg-[var(--paper)]'
                 }
               >
-                {r.sound ? (
+                {r.image ? (
+                  <span className="flex flex-1 items-center gap-2.5">
+                    {/*
+                     * Miniatura, e nao o nome: numa rodada de imagem a piada e
+                     * a figura, e boa parte dos arquivos se chama
+                     * "33636328461926442". A legenda so entra quando diz algo.
+                     */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={r.image.url}
+                      alt={nomeLegivel(r.image.name) ?? 'Figurinha'}
+                      className="size-14 shrink-0 rounded-[calc(var(--radius)-6px)] border border-[var(--line-soft)] object-cover"
+                    />
+                    {nomeLegivel(r.image.name) && (
+                      <span className="font-bold">{r.image.name}</span>
+                    )}
+                  </span>
+                ) : r.sound ? (
                   <span className="flex flex-1 items-center gap-2.5">
                     <PlaySound sound={r.sound} />
                     <span className="font-bold">{r.sound.name}</span>
@@ -852,7 +905,21 @@ function RoundWinner({ reveal }: { reveal: RevealView[] }) {
       <div className="mt-3 space-y-4">
         {winners.map((w) => (
           <div key={w.id}>
-            {w.sound ? (
+            {w.image ? (
+              <div className="space-y-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={w.image.url}
+                  alt={nomeLegivel(w.image.name) ?? 'Figurinha'}
+                  className="max-h-64 w-auto rounded-[var(--radius)] border-[length:var(--border-w)] border-[var(--paper)] object-contain"
+                />
+                {nomeLegivel(w.image.name) && (
+                  <p className="text-lg leading-snug font-bold">
+                    {w.image.name}
+                  </p>
+                )}
+              </div>
+            ) : w.sound ? (
               <p className="flex items-center gap-3 text-xl leading-snug font-bold">
                 <PlaySound sound={w.sound} invertido />
                 {w.sound.name}

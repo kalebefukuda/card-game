@@ -8,8 +8,9 @@ import {
 import { prisma } from '@/lib/prisma'
 import { answerCards } from '@/data/answerCards'
 import { promptCards } from '@/data/promptCards'
-import { MIN_PLAYERS, SOUND_HAND_SIZE } from '@/lib/constants'
+import { MIN_PLAYERS, SOUND_HAND_SIZE, IMAGE_HAND_SIZE } from '@/lib/constants'
 import { getSoundLibrary } from '@/lib/soundLibrary'
+import { getImageLibrary } from '@/lib/imageLibrary'
 
 export {
   HAND_SIZE,
@@ -106,11 +107,38 @@ function deadlineFor(turnSeconds: number) {
   return turnSeconds > 0 ? new Date(Date.now() + turnSeconds * 1000) : null
 }
 
-/** Uma rodada a cada `soundEvery` e de som. 0 desliga. */
-function roundKind(soundEvery: number, number: number): RoundKind {
-  return soundEvery > 0 && number % soundEvery === 0
-    ? RoundKind.SOUND
-    : RoundKind.TEXT
+/** Menor multiplo comum, para saber onde as duas cadencias se encontram. */
+function mmc(a: number, b: number) {
+  const mdc = (x: number, y: number): number => (y === 0 ? x : mdc(y, x % y))
+  return (a * b) / mdc(a, b)
+}
+
+type Cadencias = { soundEvery: number; imageEvery: number }
+
+/**
+ * De que tipo e a rodada numero N.
+ *
+ * Som e imagem tem cadencias independentes, entao podem cair na mesma rodada —
+ * e com as duas ligadas na mesma frequencia, que e o caso mais provavel, TODA
+ * rodada de imagem colidiria com uma de som. Dar prioridade fixa a um dos dois
+ * faria o outro simplesmente nunca acontecer, sem erro nenhum aparecer: o host
+ * ligaria a rodada de imagem e ela nao viria. Por isso a colisao alterna,
+ * contando quantas ja houve ate aqui.
+ */
+function roundKind(cadencias: Cadencias, number: number): RoundKind {
+  const { soundEvery, imageEvery } = cadencias
+  const som = soundEvery > 0 && number % soundEvery === 0
+  const imagem = imageEvery > 0 && number % imageEvery === 0
+
+  if (som && imagem) {
+    const encontro = mmc(soundEvery, imageEvery)
+    return Math.floor(number / encontro) % 2 === 1
+      ? RoundKind.SOUND
+      : RoundKind.IMAGE
+  }
+  if (som) return RoundKind.SOUND
+  if (imagem) return RoundKind.IMAGE
+  return RoundKind.TEXT
 }
 
 /**
@@ -122,34 +150,49 @@ function roundKind(soundEvery: number, number: number): RoundKind {
  * as rodadas, e a repeticao ficou obvia jogando. Com a biblioteca maior, cabe
  * sortear de novo, e e o que faz a rodada de som surpreender.
  */
-async function dealSoundHands(soundEvery: number, playerCount: number) {
-  if (soundEvery <= 0) return []
+async function dealSpecialHands(kind: RoundKind, playerCount: number) {
+  if (kind === RoundKind.TEXT) return []
+
+  const som = kind === RoundKind.SOUND
 
   /*
    * Mesma fonte que o gameState usa para montar a tela. Consultar o banco aqui
    * e o cache la deixava os dois discordarem: uma carta recem-semeada podia ser
    * distribuida e depois sumir da mao, porque o cache ainda nao a conhecia.
    */
-  const library = [...(await getSoundLibrary()).values()]
+  const library = som
+    ? [...(await getSoundLibrary()).values()]
+    : [...(await getImageLibrary()).values()]
 
   if (library.length < playerCount) {
+    const oque = som ? 'som(ns)' : 'imagem(ns)'
+    const acao = som
+      ? 'Suba mais sons ou desligue a rodada de som.'
+      : 'Suba mais imagens ou desligue a rodada de imagem.'
     throw new GameError(
-      `A biblioteca tem ${library.length} som(ns) e a sala tem ${playerCount} ` +
-        'jogadores. Suba mais sons ou desligue a rodada de som.',
+      `A biblioteca tem ${library.length} ${oque} e a sala tem ${playerCount} ` +
+        `jogadores. ${acao}`,
       409
     )
   }
 
-  // Cabe menos que o ideal? Reparte o que da, em vez de repetir som na mesa.
+  // Cabe menos que o ideal? Reparte o que da, em vez de repetir carta na mesa.
   const perPlayer = Math.min(
-    SOUND_HAND_SIZE,
+    som ? SOUND_HAND_SIZE : IMAGE_HAND_SIZE,
     Math.floor(library.length / playerCount)
   )
-  const pool = shuffle(library.map((s) => s.id))
+  const pool = shuffle(library.map((c) => c.id))
 
   return Array.from({ length: playerCount }, (_, i) =>
     pool.slice(i * perPlayer, (i + 1) * perPlayer)
   )
+}
+
+/** Em que campo do jogador a mao daquele tipo de rodada e guardada. */
+function handFieldFor(kind: RoundKind, hand: string[]) {
+  if (kind === RoundKind.SOUND) return { soundHand: hand }
+  if (kind === RoundKind.IMAGE) return { imageHand: hand }
+  return {}
 }
 
 /** Host inicia a partida: embaralha, distribui as maos e abre a rodada 1. */
@@ -166,16 +209,17 @@ export async function startGame(code: string, playerId: string) {
   const promptDeck = shuffle(promptCards)
   let answerDeck = shuffle(answerCards)
 
-  const primeiroKind = roundKind(game.soundEvery, 1)
-  const soundHands =
-    primeiroKind === RoundKind.SOUND
-      ? await dealSoundHands(game.soundEvery, game.players.length)
-      : []
+  const primeiroKind = roundKind(game, 1)
+  const especiais = await dealSpecialHands(primeiroKind, game.players.length)
 
   const hands = game.players.map((p, i) => {
     const { drawn, remaining } = draw(answerDeck, game.handSize, answerCards)
     answerDeck = remaining
-    return { playerId: p.id, hand: drawn, soundHand: soundHands[i] ?? [] }
+    return {
+      playerId: p.id,
+      hand: drawn,
+      especial: handFieldFor(primeiroKind, especiais[i] ?? []),
+    }
   })
 
   const prompt = promptDeck.shift() as string
@@ -184,7 +228,15 @@ export async function startGame(code: string, playerId: string) {
     ...hands.map((h) =>
       prisma.player.update({
         where: { id: h.playerId },
-        data: { hand: h.hand, soundHand: h.soundHand, score: 0 },
+        // Mao de som/imagem zerada a cada partida: sobra de partida anterior
+        // apareceria como carta que o jogador nao ganhou nesta.
+        data: {
+          hand: h.hand,
+          soundHand: [],
+          imageHand: [],
+          score: 0,
+          ...h.especial,
+        },
       })
     ),
     prisma.game.update({
@@ -208,7 +260,7 @@ export async function startGame(code: string, playerId: string) {
 export async function submitCard(
   code: string,
   playerId: string,
-  input: { card?: string; soundCardId?: string }
+  input: { card?: string; soundCardId?: string; imageCardId?: string }
 ) {
   const game = await loadGame(code)
   const player = requirePlayer(game.players, playerId)
@@ -236,13 +288,32 @@ export async function submitCard(
     if (!sound) throw new GameError('Som não encontrado', 404)
 
     // O nome vai junto para o historico sobreviver caso o som saia do acervo.
-    // A mao de som nao e consumida — ver dealSoundHands.
+    // A mao nao e consumida: ela e sorteada de novo a cada rodada especial.
     await prisma.submission.create({
       data: {
         roundId: round.id,
         playerId: player.id,
         card: sound.name,
         soundCardId,
+      },
+    })
+  } else if (round.kind === RoundKind.IMAGE) {
+    const { imageCardId } = input
+    if (!imageCardId) throw new GameError('Escolha uma carta de imagem', 400)
+    if (!player.imageHand.includes(imageCardId))
+      throw new GameError('Essa imagem não está na sua mão', 400)
+
+    const image = await prisma.imageCard.findUnique({
+      where: { id: imageCardId },
+    })
+    if (!image) throw new GameError('Imagem não encontrada', 404)
+
+    await prisma.submission.create({
+      data: {
+        roundId: round.id,
+        playerId: player.id,
+        card: image.name,
+        imageCardId,
       },
     })
   } else {
@@ -455,6 +526,23 @@ export async function resolveExpiredRound(code: string) {
             },
           })
         )
+      } else if (round.kind === RoundKind.IMAGE) {
+        const escolhida = sorteia(p.imageHand)
+        if (!escolhida) continue
+        const img = await prisma.imageCard.findUnique({
+          where: { id: escolhida },
+        })
+        if (!img) continue
+        await ignorandoDuplicata(() =>
+          prisma.submission.create({
+            data: {
+              roundId: round.id,
+              playerId: p.id,
+              card: img.name,
+              imageCardId: escolhida,
+            },
+          })
+        )
       } else {
         const carta = sorteia(p.hand)
         if (!carta) continue
@@ -527,7 +615,7 @@ export async function nextRound(code: string, playerId: string) {
     throw new GameError('A rodada ainda não terminou', 409)
 
   const numero = round.number + 1
-  const kind = roundKind(game.soundEvery, numero)
+  const kind = roundKind(game, numero)
 
   let answerDeck = [...game.answerDeck]
   const refills = game.players.map((p) => {
@@ -541,11 +629,8 @@ export async function nextRound(code: string, playerId: string) {
     return { playerId: p.id, hand: drawn }
   })
 
-  // Mao de som sorteada de novo, e so quando a rodada que abre e de som.
-  const soundHands =
-    kind === RoundKind.SOUND
-      ? await dealSoundHands(game.soundEvery, game.players.length)
-      : []
+  // Mao especial sorteada de novo, e so quando a rodada que abre pede uma.
+  const especiais = await dealSpecialHands(kind, game.players.length)
 
   let promptDeck = [...game.promptDeck]
   if (promptDeck.length === 0) promptDeck = shuffle(promptCards)
@@ -558,7 +643,7 @@ export async function nextRound(code: string, playerId: string) {
         where: { id: p.id },
         data: {
           ...(refill ? { hand: refill.hand } : {}),
-          ...(soundHands.length ? { soundHand: soundHands[i] ?? [] } : {}),
+          ...(especiais.length ? handFieldFor(kind, especiais[i] ?? []) : {}),
         },
       })
     }),
